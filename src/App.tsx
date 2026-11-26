@@ -92,7 +92,7 @@ export default function App() {
   if (wide)
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {PROTO && <ProtoBar />}
+        {PROTO && <ProtoBar patients={data.patients} />}
         <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 20, background: c.surface, borderBottom: `1px solid ${c.line}` }}>
           <div style={{ maxWidth: 1184, margin: '0 auto', height: 64, padding: '0 32px', display: 'flex', alignItems: 'center', gap: 32 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -132,7 +132,7 @@ export default function App() {
           <span style={{ fontSize: 17, fontWeight: 600 }}>דיווח חודשי</span>
         </div>
       </header>
-      {PROTO && <ProtoBar />}
+      {PROTO && <ProtoBar patients={data.patients} />}
       <main style={{ flex: 1, width: '100%', padding: '16px 16px 104px' }}>{screen}</main>
       <nav
         aria-label="ניווט ראשי"

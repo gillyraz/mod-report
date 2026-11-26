@@ -38,12 +38,12 @@ export function PageBar({ ctx, title, lead, middle, actions }: { ctx: Ctx; title
   if (wide && pageSlot)
     return createPortal(
       <div style={{ borderTop: `1px solid ${c.line}` }}>
-        <div style={{ maxWidth: 1184, margin: '0 auto', minHeight: 64, padding: '12px 32px', display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ maxWidth: 1184, margin: '0 auto', minHeight: 64, padding: '12px 32px', display: 'flex', alignItems: 'center', columnGap: 24, rowGap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: '0 0 auto' }}>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{title}</h1>
             {lead}
           </div>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 16, fontSize: 14, color: c.ink2 }}>{middle}</div>
+          <div style={{ flex: '1 1 420px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 14, color: c.ink2 }}>{middle}</div>
           {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>{actions}</div>}
         </div>
       </div>,
