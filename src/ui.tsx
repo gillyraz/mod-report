@@ -4,31 +4,34 @@ import { Minus, Plus, X } from 'lucide-react'
 export const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
 export const c = {
-  bg: '#F4F7FC',
+  bg: '#F6F8FD',
   surface: '#FFFFFF',
-  sub: '#EEF2F8',
-  group: '#E9EEF6',
-  ink: '#14181F',
-  ink2: '#4B5563',
-  ink3: '#6B7280',
-  ink4: '#9AA1AC',
-  line: '#E2E8F1',
-  primary: '#1B365D',
-  primaryHover: '#152C4D',
-  primary2: '#24497C',
-  focus: '#2F6FEB',
-  okBg: '#E3F3EA',
-  okSurf: '#EDF6F1',
-  ok: '#13734A',
-  warnBg: '#FFF1D6',
-  warnSoft: '#FFF6E5',
-  warn: '#8F5600',
+  sub: '#F2F5FB',
+  group: '#EDF1F8',
+  field: '#F6F8FC',
+  ink: '#101828',
+  ink2: '#475467',
+  ink3: '#667085',
+  ink4: '#98A2B3',
+  line: '#E6EBF3',
+  primary: '#4566E8',
+  primaryHover: '#3753CF',
+  primarySoft: '#EEF2FF',
+  primaryInk: '#2F48B8',
+  navy: '#1B2559',
+  focus: '#4566E8',
+  okBg: '#E3F5EC',
+  okSurf: '#EFF8F3',
+  ok: '#16855A',
+  warnBg: '#FFF1DA',
+  warnSoft: '#FFF7EA',
+  warn: '#A15C07',
   dangerBg: '#FDECEA',
-  danger: '#B3261E',
+  danger: '#C4321F',
 }
 
 /** צל רך לכרטיסים: מסגרת דקה ועומק קל */
-export const lift = '0 0 0 1px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.05)'
+export const lift = '0 0 0 1px rgba(16,24,40,0.05), 0 1px 3px rgba(16,24,40,0.04)'
 
 export function useWide(min = 900) {
   const q = `(min-width: ${min}px)`
@@ -73,7 +76,7 @@ export function Button({
     height: 40,
     padding: children ? '0 16px' : 0,
     width: full ? '100%' : children ? undefined : 40,
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 15,
     fontWeight: 500,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -83,9 +86,9 @@ export function Button({
     whiteSpace: 'nowrap',
   }
   const kinds: Record<BtnKind, CSSProperties> = {
-    primary: { background: hover && !disabled ? c.primaryHover : c.primary, color: '#fff', boxShadow: '0 1px 2px rgba(16,24,40,0.12), inset 0 1px 0 rgba(255,255,255,0.08)' },
-    secondary: { background: hover && !disabled ? c.sub : c.surface, color: c.ink, borderColor: '#DCE3EE', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' },
-    ghost: { background: hover && !disabled ? c.sub : 'transparent', color: c.ink },
+    primary: { background: hover && !disabled ? c.primaryHover : 'linear-gradient(180deg, #5577F0, #4566E8)', color: '#fff', boxShadow: disabled ? 'none' : '0 1px 2px rgba(69,102,232,0.3), 0 4px 12px -4px rgba(69,102,232,0.45), inset 0 1px 0 rgba(255,255,255,0.18)' },
+    secondary: { background: hover && !disabled ? c.sub : c.surface, color: c.ink, borderColor: '#E1E7F2', boxShadow: '0 1px 2px rgba(16,24,40,0.04)' },
+    ghost: { background: hover && !disabled ? c.sub : 'transparent', color: c.ink2 },
     danger: { background: hover && !disabled ? c.dangerBg : 'transparent', color: c.danger },
   }
   return (
@@ -126,9 +129,10 @@ export function Field({
   suffix?: string
   dirLtr?: boolean
 }) {
+  const [focus, setFocus] = useState(false)
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-      <span style={{ fontSize: 14, fontWeight: 500, color: c.ink }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: c.ink2 }}>{label}</span>
       <span style={{ position: 'relative', display: 'flex' }}>
         <input
           value={value}
@@ -136,15 +140,20 @@ export function Field({
           inputMode={inputMode}
           autoFocus={autoFocus}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocus(true)}
+          onBlur={() => setFocus(false)}
           dir={dirLtr ? 'ltr' : undefined}
           style={{
             flex: 1,
             minWidth: 0,
             height: 48,
             padding: suffix ? '0 16px 0 40px' : '0 16px',
-            borderRadius: 10,
-            border: '1px solid #DCE3EE',
-            background: c.surface,
+            borderRadius: 12,
+            border: 'none',
+            outline: 'none',
+            boxShadow: focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.line}`,
+            background: focus ? c.surface : c.field,
+            transition: `box-shadow 200ms ${EASE}, background 200ms ${EASE}`,
             fontSize: 16,
             color: c.ink,
             textAlign: dirLtr ? 'right' : undefined,
@@ -156,7 +165,7 @@ export function Field({
           </span>
         )}
       </span>
-      {hint && <span style={{ fontSize: 13, color: c.ink2 }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 12, color: c.ink3 }}>{hint}</span>}
     </label>
   )
 }
@@ -177,7 +186,7 @@ export function Stepper({ value, onChange, label, hideLabel }: { value: number; 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {!hideLabel && <span style={{ fontSize: 13, color: c.ink2 }}>{label}</span>}
-      <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', background: c.sub, borderRadius: 10, height: 40, alignSelf: 'flex-start' }}>
+      <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', background: c.sub, borderRadius: 12, height: 40, alignSelf: 'flex-start' }}>
         <button style={btn} aria-label={`הוספה: ${label}`} onClick={() => onChange(value + 1)}>
           <Plus size={16} />
         </button>
@@ -205,8 +214,8 @@ export function Badge({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; child
   )
 }
 
-/** חלון: בדסקטופ במרכז, בנייד כגיליון מלמטה */
-export function Sheet({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+/** חלון: בדסקטופ במרכז, בנייד כגיליון מלמטה. נסגר רק מהכפתורים שלו */
+export function Sheet({ title, sub, icon, onClose, children, footer, wide }: { title: string; sub?: ReactNode; icon?: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const desk = useWide(700)
   // המסך שמאחורי החלון לא נגלל כל עוד החלון פתוח
   useEffect(() => {
@@ -220,39 +229,48 @@ export function Sheet({ title, onClose, children, footer, wide }: { title: strin
       document.body.style.paddingInlineEnd = ''
     }
   }, [])
+  const px = desk ? 28 : 20
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(16,22,34,0.42)', display: 'flex', alignItems: desk ? 'center' : 'flex-end', justifyContent: 'center', zIndex: 50, animation: `fade 240ms ${EASE}` }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.28)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: desk ? 'center' : 'flex-end', justifyContent: 'center', zIndex: 50, animation: `fade 240ms ${EASE}` }}
     >
       <div
         style={{
-          background: c.bg,
+          background: c.surface,
           width: desk ? (wide ? 760 : 520) : '100%',
           maxHeight: desk ? '88vh' : '92vh',
-          borderRadius: desk ? 20 : '20px 20px 0 0',
+          borderRadius: desk ? 24 : '24px 24px 0 0',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           animation: `rise 360ms ${EASE}`,
-          boxShadow: '0 24px 64px rgba(16,22,34,0.24)',
+          boxShadow: '0 24px 64px -12px rgba(15,23,42,0.35)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px 16px 16px', paddingInlineStart: 24, background: c.surface, borderBottom: `1px solid ${c.line}` }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: -0.2 }}>{title}</h2>
-          <Button kind="ghost" title="סגירה" icon={<X size={20} />} onClick={onClose} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: `${px}px ${px}px 8px` }}>
+          {icon && (
+            <span aria-hidden style={{ flex: '0 0 44px', height: 44, borderRadius: 14, background: c.primarySoft, color: c.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {icon}
+            </span>
+          )}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: icon ? 0 : 4 }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: -0.2 }}>{title}</h2>
+            {sub && <p style={{ margin: 0, fontSize: 14, color: c.ink3, lineHeight: 1.5 }}>{sub}</p>}
+          </div>
+          <Button kind="ghost" title="סגירה" icon={<X size={18} />} onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, background: c.sub, color: c.ink3 }} />
         </div>
-        <div style={{ padding: 24, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
-        {footer && <div style={{ padding: '16px 24px', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', background: c.surface, borderTop: `1px solid ${c.line}`, display: 'flex', gap: 8, justifyContent: 'flex-start', flexWrap: 'wrap' }}>{footer}</div>}
+        <div style={{ padding: `16px ${px}px ${footer ? 16 : px}px`, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
+        {footer && <div style={{ padding: `8px ${px}px ${px}px`, paddingBottom: `max(${px}px, env(safe-area-inset-bottom))`, display: 'flex', gap: 8, justifyContent: 'flex-start', flexWrap: 'wrap' }}>{footer}</div>}
       </div>
     </div>
   )
 }
 
 export function Card({ children, style, ref, id }: { children: ReactNode; style?: CSSProperties; ref?: React.Ref<HTMLDivElement>; id?: string }) {
-  return <div ref={ref} id={id} style={{ background: c.surface, borderRadius: 16, boxShadow: lift, ...style }}>{children}</div>
+  return <div ref={ref} id={id} style={{ background: c.surface, borderRadius: 20, boxShadow: lift, ...style }}>{children}</div>
 }
 
 export function Toast({ t, onDone, lift }: { t: { text: string; action?: { label: string; run: () => void } } | null; onDone: () => void; lift?: boolean }) {

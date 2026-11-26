@@ -94,13 +94,13 @@ export default function App() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {PROTO && <ProtoBar patients={data.patients} />}
-        <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 20, background: c.surface, borderBottom: `1px solid ${c.line}` }}>
-          <div style={{ maxWidth: 1184, margin: '0 auto', height: 64, padding: '0 32px', display: 'flex', alignItems: 'center', gap: 48 }}>
+        <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(230,235,243,0.9)' }}>
+          <div style={{ maxWidth: 1184, margin: '0 auto', height: 64, padding: '0 32px', display: 'flex', alignItems: 'center', gap: 40 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img src={logo} alt="" width={36} height={36} style={{ borderRadius: 10 }} />
+              <img src={logo} alt="" width={36} height={36} style={{ borderRadius: 12, boxShadow: '0 4px 10px -4px rgba(69,102,232,0.6)' }} />
               <span style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: -0.1 }}>דיווח חודשי</span>
             </div>
-            <nav aria-label="ניווט ראשי" style={{ display: 'flex', gap: 4, height: '100%' }}>
+            <nav aria-label="ניווט ראשי" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 14, background: c.sub }}>
               {tabs.map((t) => {
                 const on = tab === t.id
                 return (
@@ -108,18 +108,17 @@ export default function App() {
                     key={t.id}
                     onClick={() => setTab(t.id)}
                     aria-current={on ? 'page' : undefined}
-                    style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', background: 'transparent', border: 'none', color: on ? c.primary : c.ink3, fontSize: 15, fontWeight: on ? 600 : 500, cursor: 'pointer', transition: `color 200ms ${EASE}` }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 14px', borderRadius: 10, background: on ? c.surface : 'transparent', boxShadow: on ? '0 1px 2px rgba(16,24,40,0.08)' : 'none', border: 'none', color: on ? c.ink : c.ink3, fontSize: 15, fontWeight: on ? 600 : 500, cursor: 'pointer', transition: `background 200ms ${EASE}, color 200ms ${EASE}` }}
                   >
-                    <t.icon size={18} />
+                    <t.icon size={17} style={{ color: on ? c.primary : undefined }} />
                     {t.label}
-                    <span aria-hidden style={{ position: 'absolute', bottom: 0, insetInline: 16, height: 2, borderRadius: '2px 2px 0 0', background: on ? c.primary : 'transparent', transition: `background 200ms ${EASE}` }} />
                   </button>
                 )
               })}
             </nav>
             <span style={{ flex: 1 }} />
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: c.ink3 }}>
-              <ShieldCheck size={16} style={{ color: c.ok }} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: c.ink3, height: 32, padding: '0 12px', borderRadius: 999, background: c.okSurf }}>
+              <ShieldCheck size={15} style={{ color: c.ok }} />
               המידע נשמר רק במחשב הזה
             </span>
           </div>

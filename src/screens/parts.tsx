@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { Ctx } from '../App'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { Button, c, lift } from '../ui'
+import { Button, c } from '../ui'
 import { monthLabel, shiftMonth } from '../model'
 
 export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
@@ -16,15 +16,15 @@ export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: Reac
   )
 }
 
-export function MonthSwitcher({ month, setMonth, disabled }: { month: string; setMonth: (m: string) => void; disabled?: boolean }) {
+export function MonthSwitcher({ month, setMonth, disabled, compact }: { month: string; setMonth: (m: string) => void; disabled?: boolean; compact?: boolean }) {
   const why = disabled ? 'אי אפשר להחליף חודש באמצע הבחירה. מסיימים או מבטלים קודם.' : undefined
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: c.surface, boxShadow: lift, borderRadius: 10, height: 40 }}>
-      <Button kind="ghost" title={why ?? 'החודש הקודם'} disabled={disabled} icon={<ChevronRight size={18} />} onClick={() => setMonth(shiftMonth(month, -1))} style={{ height: 38 }} />
-      <span style={{ minWidth: 112, textAlign: 'center', fontWeight: 600, fontSize: 15 }} aria-live="polite">
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, padding: 3, background: c.surface, boxShadow: `0 0 0 1px ${c.line}, 0 1px 2px rgba(16,24,40,0.04)`, borderRadius: 12, height: compact ? 36 : 40 }}>
+      <Button kind="ghost" title={why ?? 'החודש הקודם'} disabled={disabled} icon={<ChevronRight size={16} />} onClick={() => setMonth(shiftMonth(month, -1))} style={{ height: 30, width: 30, borderRadius: 8 }} />
+      <span style={{ minWidth: compact ? 96 : 110, textAlign: 'center', fontWeight: 600, fontSize: compact ? 14 : 15 }} aria-live="polite">
         {monthLabel(month)}
       </span>
-      <Button kind="ghost" title={why ?? 'החודש הבא'} disabled={disabled} icon={<ChevronLeft size={18} />} onClick={() => setMonth(shiftMonth(month, 1))} style={{ height: 38 }} />
+      <Button kind="ghost" title={why ?? 'החודש הבא'} disabled={disabled} icon={<ChevronLeft size={16} />} onClick={() => setMonth(shiftMonth(month, 1))} style={{ height: 30, width: 30, borderRadius: 8 }} />
     </div>
   )
 }
@@ -80,14 +80,14 @@ export function useNewPatientShortcut(open: () => void, enabled = true) {
   }, [])
 }
 
-const TONES = ['#E3E9F3', '#E9E4F3', '#E1EEE8', '#F3E8E1', '#E8EEE0', '#F1E3E8']
+const TONES = ['#E5EBFF', '#EDE6FF', '#E2F3EA', '#FFEDE3', '#E7F0E0', '#FBE6EE']
 /** עיגול עם ראשי התיבות של המטופל, בגוון קבוע לכל שם */
-export function Avatar({ name }: { name: string }) {
+export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
   const parts = name.trim().split(/\s+/)
   const ini = (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
   const tone = TONES[[...name].reduce((a, ch) => a + ch.charCodeAt(0), 0) % TONES.length]
   return (
-    <span aria-hidden style={{ flex: '0 0 40px', height: 40, borderRadius: 999, background: tone, color: '#2A3446', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 600 }}>
+    <span aria-hidden style={{ flex: `0 0 ${size}px`, height: size, borderRadius: 999, background: tone, color: '#344054', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size < 36 ? 12 : 14, fontWeight: 600 }}>
       {ini}
     </span>
   )

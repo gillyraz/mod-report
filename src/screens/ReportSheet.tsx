@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Download, Share2 } from 'lucide-react'
+import { CheckCircle2, Download, FileOutput, Share2 } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, Sheet } from '../ui'
 import { calc, ils, monthLabel, refOf, vatOf, type Patient } from '../model'
@@ -17,12 +17,17 @@ export default function ReportSheet({ ctx, list, onClose, onDone }: { ctx: Ctx; 
   for (let i = 0; i < list.length; i += MAX) batches.push(list.slice(i, i + MAX))
 
   return (
-    <Sheet title={`הפקת דיווח · ${monthLabel(month)}`} onClose={onClose} wide>
-      <p style={{ margin: 0, color: c.ink2, fontSize: 15, lineHeight: 1.6 }}>
-        {batches.length > 1
+    <Sheet
+      title={`הפקת דיווח · ${monthLabel(month)}`}
+      icon={<FileOutput size={20} />}
+      sub={
+        batches.length > 1
           ? `המערכת של המשרד מקבלת עד ${MAX} מטופלים בבקשה, ולכן הטבלה חולקה ל-${batches.length} טבלאות. שומרים כל אחת ומעלים אותה בבקשה נפרדת, יחד עם הטפסים הסרוקים מה-Drive.`
-          : 'שומרים את הטבלה ומעלים אותה לאתר המשרד, יחד עם הטפסים הסרוקים מה-Drive.'}
-      </p>
+          : 'שומרים את הטבלה ומעלים אותה לאתר המשרד, יחד עם הטפסים הסרוקים מה-Drive.'
+      }
+      onClose={onClose}
+      wide
+    >
       {batches.map((b, i) => (
         <Batch
           key={i}

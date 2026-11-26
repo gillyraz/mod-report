@@ -60,6 +60,7 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
   return (
     <Sheet
       title="ייבוא מטופלים מאקסל"
+      icon={<FileSpreadsheet size={20} />}
       wide
       onClose={onClose}
       footer={
@@ -94,7 +95,7 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
             onDragOver={(e) => (e.preventDefault(), setOver(true))}
             onDragLeave={() => setOver(false)}
             onDrop={(e) => (e.preventDefault(), setOver(false), read(e.dataTransfer.files[0]))}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: over ? '#E8EEF6' : c.sub, border: `1px dashed ${over ? c.primary : c.line}`, borderRadius: 12, cursor: 'pointer', font: 'inherit', color: c.ink, textAlign: 'start', transition: 'background 160ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: over ? c.primarySoft : c.sub, border: `1px dashed ${over ? c.primary : c.line}`, borderRadius: 12, cursor: 'pointer', font: 'inherit', color: c.ink, textAlign: 'start', transition: 'background 160ms cubic-bezier(0.16, 1, 0.3, 1)' }}
           >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', background: c.surface, borderRadius: 8, overflow: 'hidden', border: `1px solid ${c.line}` }}>
               {HEADS.map((h, i) => (

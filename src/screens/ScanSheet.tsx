@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { ExternalLink, RefreshCw, Trash2 } from 'lucide-react'
+import { ExternalLink, FileText, RefreshCw, Trash2 } from 'lucide-react'
 import { Button, c, Sheet } from '../ui'
 import type { Patient, Scan } from '../model'
 
@@ -9,6 +9,7 @@ export default function ScanSheet({ scan, patient, onReplace, onRemove, onClose 
   return (
     <Sheet
       title={`הסריקה של ${patient.name}`}
+      icon={<FileText size={20} />}
       onClose={onClose}
       footer={
         <>

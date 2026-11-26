@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Archive, ArchiveRestore, CalendarPlus } from 'lucide-react'
+import { Archive, ArchiveRestore, CalendarPlus, UserPen, UserPlus } from 'lucide-react'
 import { Button, c, Field, Sheet } from '../ui'
 import { monthLabel, uid, type Patient } from '../model'
 
@@ -39,6 +39,8 @@ export default function PatientForm({
   return (
     <Sheet
       title={patient ? 'עריכת מטופל' : 'מטופל חדש'}
+      icon={patient ? <UserPen size={20} /> : <UserPlus size={20} />}
+      sub="הפרטים מוזנים פעם אחת ומשמשים לכל חודש."
       onClose={onClose}
       footer={
         <>

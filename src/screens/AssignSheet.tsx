@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, FileText, Trash2, Undo2 } from 'lucide-react'
+import { ArrowRight, FileStack, FileText, Trash2, Undo2 } from 'lucide-react'
 import { Button, c, Sheet } from '../ui'
 import type { Entry, Patient, Scan } from '../model'
 
@@ -40,6 +40,7 @@ export default function AssignSheet({
   return (
     <Sheet
       title="שיוך סריקות למטופלים"
+      icon={<FileStack size={20} />}
       onClose={onClose}
       wide
       footer={
