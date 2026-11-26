@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { AlertCircle, Check, Eye, EyeOff, FileText, FolderOpen, KeyRound, Lock, ShieldCheck, Sheet, Users } from 'lucide-react'
+import { AlertCircle, Check, Clock, LockOpen, Eye, EyeOff, FileText, FolderOpen, KeyRound, Lock, ShieldCheck, Sheet, Users } from 'lucide-react'
 import logo from '../../public/favicon.svg'
 import { Button, c, EASE } from '../ui'
 import * as vault from '../vault'
@@ -193,7 +193,7 @@ function PasswordStep({ wide, label, folders, onBack, onOpen }: { wide: boolean;
           )}
         </div>
         <h1 style={{ ...h1, marginTop: 16 }}>סיסמה לפתיחת הכלי</h1>
-        <p style={{ ...lead, marginBottom: 8 }}>המידע נשמר מוצפן. גם מי שפותח את התיקייה לא יכול לקרוא אותו בלי הסיסמה.</p>
+        <p style={{ ...lead, marginBottom: 8 }}>המידע נשמר מוצפן, ואי אפשר לקרוא אותו בלי הסיסמה.</p>
         <PasswordField label="סיסמה" value={pw} onChange={setPw} autoFocus autoComplete="new-password" hint={tried && short ? 'הסיסמה קצרה מדי. צריך לפחות 8 תווים.' : 'לפחות 8 תווים'} invalid={tried && short} />
         <PasswordField label="הקלדה חוזרת של הסיסמה" value={pw2} onChange={setPw2} autoComplete="new-password" hint={tried && differ ? 'הסיסמאות לא זהות.' : undefined} invalid={tried && differ} />
         <Note tone="tip" icon={<KeyRound size={18} />}>
@@ -244,11 +244,11 @@ function UnlockStep({ wide, label, note, onOpen, onOther }: { wide: boolean; lab
           <PasswordField label="סיסמה" value={pw} onChange={(v) => (setPw(v), setErr(undefined))} autoFocus autoComplete="current-password" invalid={!!err} />
         </div>
         {err && <div style={{ width: '100%', textAlign: 'start' }}><Note tone="danger">{err}</Note></div>}
-        <Button kind="primary" type="submit" icon={<Lock size={18} />} disabled={busy} style={{ height: 48, width: '100%', justifyContent: 'center', fontSize: 15, marginTop: 8 }}>
+        <Button kind="primary" type="submit" icon={<LockOpen size={18} />} disabled={busy} style={{ height: 48, width: '100%', justifyContent: 'center', fontSize: 15, marginTop: 8 }}>
           {busy ? 'פותח…' : 'פתיחת הכלי'}
         </Button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13, color: c.ink3 }}>
-          <AlertCircle size={14} />
+          <Clock size={14} />
           הכלי ננעל לבד אחרי זמן בלי שימוש
         </div>
         {onOther && (

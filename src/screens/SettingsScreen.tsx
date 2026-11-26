@@ -94,25 +94,21 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
       <span aria-hidden style={{ height: 24 }} />
 
       <Section wide={ctx.wide} flush title="שמירה ואבטחה" desc="איפה המידע נשמר ומי יכול לפתוח אותו.">
-        <Row icon={<FolderOpen size={18} />} title={vault.isFolder() ? `תיקייה ״${folder}״` : folder} desc={vault.isFolder() ? 'כאן נשמרים המטופלים, הסריקות והטבלאות. כל שינוי נשמר מיד.' : 'המידע נשמר מוצפן בדפדפן, במכשיר הזה בלבד.'}>
+        <Row icon={<FolderOpen size={18} />} title={vault.isFolder() ? `תיקייה ״${folder}״` : folder} desc={vault.isFolder() ? 'כאן נשמרים המטופלים, הסריקות והטבלאות.' : 'המידע נשמר מוצפן בדפדפן, במכשיר הזה בלבד.'}>
           {vault.isFolder() && vault.canPickFolder() && <Button onClick={move}>העברה לתיקייה אחרת</Button>}
         </Row>
         <Divider />
         <ChangePassword toast={toast} />
         <Divider />
-        <Row icon={<Lock size={18} />} title="נעילה אוטומטית" desc={`הכלי ננעל אחרי ${s.lockMinutes} דקות בלי שימוש.`}>
-          <select aria-label="נעילה אוטומטית אחרי" value={s.lockMinutes} onChange={(e) => set({ lockMinutes: Number(e.target.value) })} style={{ height: 40, borderRadius: 12, border: 'none', background: c.sub, padding: '0 12px', fontSize: 14, fontWeight: 500, color: c.ink, cursor: 'pointer' }}>
-            {[5, 15, 30, 60].map((m) => (
-              <option key={m} value={m}>
-                {m} דקות
-              </option>
-            ))}
-          </select>
+        <Row icon={<Lock size={18} />} title="נעילה אוטומטית" desc="כשאין שימוש הכלי ננעל, והמידע נשאר מוצפן.">
+          <Segmented label="נעילה אוטומטית אחרי" value={s.lockMinutes} onChange={(v) => set({ lockMinutes: v })} options={[5, 15, 30, 60].map((m) => [m, `${m} דק׳`] as const)} />
         </Row>
       </Section>
 
       <Section wide={ctx.wide} title="חישוב" desc="מע״מ והסכום שמופיע בטבלה שנשלחת למשרד.">
-        <Field label="שיעור מע״מ" value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={`חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
+        <div style={{ maxWidth: 480 }}>
+          <Field label="שיעור מע״מ" value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={`חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
+        </div>
         {vatBad && (
           <p role="alert" style={{ margin: '-8px 0 0', fontSize: 14, color: c.danger }}>
             שיעור מע״מ צריך להיות מספר בין 0 ל-100. נשמר השיעור הקודם, {mv.rate}%.
@@ -120,34 +116,19 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         )}
         <Toggle label="עוסק פטור (בלי מע״מ)" checked={mv.exempt} onChange={(v) => setData((d) => setVatFrom(d, month, { rate: vatOf(d, month).rate, exempt: v }))} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 500 }}>הסכום שמופיע בטבלה החודשית</span>
-          <div role="radiogroup" aria-label="הסכום שמופיע בטבלה החודשית" style={{ display: 'inline-flex', alignSelf: 'flex-start', background: c.group, borderRadius: 10, padding: 4, gap: 4 }}>
-            {(
-              [
-                ['total', 'סה״כ כולל מע״מ'],
-                ['beforeVat', 'לפני מע״מ'],
-              ] as const
-            ).map(([v, l]) => (
-              <button
-                key={v}
-                role="radio"
-                aria-checked={s.tableAmount === v}
-                onClick={() => set({ tableAmount: v })}
-                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: s.tableAmount === v ? c.surface : 'transparent', boxShadow: s.tableAmount === v ? '0 1px 2px rgba(16,24,40,0.10)' : 'none', color: s.tableAmount === v ? c.ink : c.ink2, fontWeight: s.tableAmount === v ? 600 : 500, fontSize: 14, cursor: 'pointer', transition: `background 200ms ${EASE}` }}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: c.ink2 }}>הסכום שמופיע בטבלה החודשית</span>
+          <Segmented label="הסכום שמופיע בטבלה החודשית" value={s.tableAmount} onChange={(v) => set({ tableAmount: v })} options={[['total', 'סה״כ כולל מע״מ'], ['beforeVat', 'לפני מע״מ']] as const} />
         </div>
       </Section>
 
       <Section wide={ctx.wide} title="פרטים בראש הטבלה" desc="מה שמופיע מעל הטבלה החודשית.">
-        <Field label="שם המטפל/ת" value={s.therapistName} onChange={(v) => set({ therapistName: v })} hint="מופיע מעל הטבלה החודשית. לא חובה." />
+        <div style={{ maxWidth: 480 }}>
+          <Field label="שם המטפל/ת" value={s.therapistName} onChange={(v) => set({ therapistName: v })} hint="מופיע מעל הטבלה החודשית. לא חובה." />
+        </div>
       </Section>
 
       <Section wide={ctx.wide} title="גיבוי" desc="קובץ נוסף עם המטופלים והסכומים, למעבר מחשב או לשחזור.">
-        <p style={{ margin: 0, color: c.ink2, fontSize: 15, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, color: c.ink2, fontSize: 15, lineHeight: 1.6, maxWidth: 640 }}>
           {vault.isFolder() ? 'העתקה של התיקייה היא הגיבוי המלא, כולל הסריקות. ' : ''}קובץ הגיבוי שומר את המטופלים והסכומים בלבד, מוצפן באותה סיסמה. הסריקות לא נכללות בו.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -225,8 +206,8 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
 /** סעיף: כותרת והסבר מימין, ומשמאל משטח לבן אחד שמקבץ את הפקדים. הסעיפים מופרדים בקו */
 function Section({ title, desc, wide, flush, children }: { title: string; desc: string; wide: boolean; flush?: boolean; children: React.ReactNode }) {
   return (
-    <section aria-label={title} style={{ display: 'grid', gridTemplateColumns: wide ? '280px minmax(0, 560px)' : '1fr', gap: wide ? 48 : 16, padding: wide ? '32px 0' : '24px 0', borderTop: `1px solid ${c.line}` }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <section aria-label={title} style={{ display: 'grid', gridTemplateColumns: wide ? '280px minmax(0, 1fr)' : '1fr', gap: wide ? 48 : 16, padding: wide ? '32px 0' : '24px 0', borderTop: `1px solid ${c.line}` }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: wide ? 22 : 0 }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{title}</h2>
         <p style={{ margin: 0, fontSize: 14, color: c.ink3, lineHeight: 1.6 }}>{desc}</p>
       </div>
@@ -257,7 +238,7 @@ function Row({ icon, title, desc, children }: { icon: React.ReactNode; title: st
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: 16 }}>
       <span style={{ width: 40, height: 40, borderRadius: 14, background: c.primarySoft, color: c.primary, display: 'grid', placeItems: 'center', flex: 'none' }}>{icon}</span>
-      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+      <div style={{ flex: '1 1 0', minWidth: 160 }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>{title}</div>
         <div style={{ color: c.ink3, fontSize: 13, marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
       </div>
@@ -291,7 +272,7 @@ function ChangePassword({ toast }: { toast: (t: string) => void }) {
         {!open && <Button onClick={() => setOpen(true)}>שינוי סיסמה</Button>}
       </Row>
       {open && (
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, margin: '0 16px 16px', background: c.sub, borderRadius: 16 }}>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px 20px', paddingInlineStart: 72, maxWidth: 72 + 480 }}>
           <Field label="הסיסמה הנוכחית" type="password" value={cur} onChange={(v) => (setCur(v), setErr(undefined))} autoFocus />
           <Field label="סיסמה חדשה" type="password" value={next} onChange={(v) => (setNext(v), setErr(undefined))} hint="לפחות 8 תווים" />
           <Field label="הקלדה חוזרת של הסיסמה החדשה" type="password" value={next2} onChange={(v) => (setNext2(v), setErr(undefined))} />
@@ -302,6 +283,22 @@ function ChangePassword({ toast }: { toast: (t: string) => void }) {
           </div>
         </form>
       )}
+    </div>
+  )
+}
+
+/** בחירה אחת מכמה אפשרויות גלויות. אותו פקד לכל בחירה כזו בהגדרות */
+function Segmented<T extends string | number>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[] }) {
+  return (
+    <div role="radiogroup" aria-label={label} style={{ display: 'inline-flex', alignSelf: 'flex-start', background: c.sub, borderRadius: 12, padding: 4, gap: 4 }}>
+      {options.map(([v, l]) => {
+        const on = value === v
+        return (
+          <button key={String(v)} role="radio" aria-checked={on} onClick={() => onChange(v)} style={{ height: 32, padding: '0 12px', borderRadius: 9, border: 'none', background: on ? c.surface : 'transparent', boxShadow: on ? '0 1px 2px rgba(16,24,40,0.10)' : 'none', color: on ? c.ink : c.ink2, fontWeight: on ? 600 : 500, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', transition: `background 200ms ${EASE}` }}>
+            {l}
+          </button>
+        )
+      })}
     </div>
   )
 }
