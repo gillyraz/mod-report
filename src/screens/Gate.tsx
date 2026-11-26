@@ -76,8 +76,9 @@ function Steps({ n }: { n: 1 | 2 }) {
   )
 }
 
-const Note = ({ tone, icon, children }: { tone: 'warn' | 'danger'; icon?: ReactNode; children: ReactNode }) => (
-  <div role={tone === 'danger' ? 'alert' : undefined} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '14px 16px', borderRadius: 14, background: tone === 'warn' ? c.warnSoft : c.dangerBg, color: tone === 'warn' ? c.warn : c.danger, fontSize: 13, lineHeight: 1.6 }}>
+// tip: הערה חשובה שאינה שגיאה (רקע חם, טקסט כחול). danger: שגיאה
+const Note = ({ tone, icon, children }: { tone: 'tip' | 'danger'; icon?: ReactNode; children: ReactNode }) => (
+  <div role={tone === 'danger' ? 'alert' : undefined} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '14px 16px', borderRadius: 14, background: tone === 'tip' ? c.warnSoft : c.dangerBg, color: tone === 'tip' ? c.primaryInk : c.danger, fontSize: 13, lineHeight: 1.6 }}>
     <span style={{ flex: '0 0 18px', marginTop: 1 }}>{icon ?? <AlertCircle size={18} />}</span>
     <span>{children}</span>
   </div>
@@ -118,7 +119,7 @@ function FolderStep({ wide, onPick, note }: { wide: boolean; onPick: () => void;
         <Steps n={1} />
         <h1 style={{ ...h1, marginTop: 12 }}>איפה לשמור את המידע?</h1>
         <p style={lead}>בוחרים תיקייה במחשב. רשימת המטופלים, הסריקות והטבלאות יישמרו בה ורק בה. התיקייה היא גם הגיבוי: מעתיקים אותה, ויש עותק של הכול.</p>
-        <Note tone="warn">עדיף תיקייה שלא מסונכרנת לענן (לא בתוך Google Drive או OneDrive), כדי שהמידע לא ייצא מהמחשב.</Note>
+        <Note tone="tip">עדיף תיקייה שלא מסונכרנת לענן (לא בתוך Google Drive או OneDrive), כדי שהמידע לא ייצא מהמחשב.</Note>
         {note && <Note tone="danger">{note}</Note>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
           <Button kind="primary" icon={<FolderOpen size={18} />} onClick={onPick} style={{ height: 48, padding: '0 22px', fontSize: 15 }}>
@@ -195,7 +196,7 @@ function PasswordStep({ wide, label, folders, onBack, onOpen }: { wide: boolean;
         <p style={{ ...lead, marginBottom: 8 }}>המידע נשמר מוצפן. גם מי שפותח את התיקייה לא יכול לקרוא אותו בלי הסיסמה.</p>
         <PasswordField label="סיסמה" value={pw} onChange={setPw} autoFocus autoComplete="new-password" hint={tried && short ? 'הסיסמה קצרה מדי. צריך לפחות 8 תווים.' : 'לפחות 8 תווים'} invalid={tried && short} />
         <PasswordField label="הקלדה חוזרת של הסיסמה" value={pw2} onChange={setPw2} autoComplete="new-password" hint={tried && differ ? 'הסיסמאות לא זהות.' : undefined} invalid={tried && differ} />
-        <Note tone="warn" icon={<KeyRound size={18} />}>
+        <Note tone="tip" icon={<KeyRound size={18} />}>
           <b>אין דרך לשחזר סיסמה שנשכחה.</b> כדאי לרשום אותה במקום בטוח מחוץ למחשב.
         </Note>
         <div style={{ marginTop: 16 }}>
@@ -238,7 +239,7 @@ function UnlockStep({ wide, label, note, onOpen, onOther }: { wide: boolean; lab
         <p style={{ ...lead, margin: 0 }}>
           המידע שמור ומוצפן ב<b style={{ color: c.ink }}>{label === 'הדפדפן במכשיר הזה' ? label : `תיקייה ״${label}״`}</b>.
         </p>
-        {note && <div style={{ width: '100%', textAlign: 'start', marginTop: 8 }}><Note tone="warn">{note}</Note></div>}
+        {note && <div style={{ width: '100%', textAlign: 'start', marginTop: 8 }}><Note tone="tip">{note}</Note></div>}
         <div style={{ width: '100%', marginTop: 16 }}>
           <PasswordField label="סיסמה" value={pw} onChange={(v) => (setPw(v), setErr(undefined))} autoFocus autoComplete="current-password" invalid={!!err} />
         </div>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DatabaseBackup, FolderOpen, KeyRound, Lock, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
-import { Button, c, Card, EASE, Field } from '../ui'
+import { Button, c, EASE, Field, lift } from '../ui'
 import * as vault from '../vault'
 import { monthLabel, setVatFrom, vatOf, type Data, type Settings } from '../model'
 import { downloadFiles } from '../files'
@@ -89,15 +89,17 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <PageBar ctx={ctx} title="הגדרות" sub="שינויים נשמרים אוטומטית." />
-      <span aria-hidden style={{ marginTop: -8 }} />
+      <span aria-hidden style={{ height: 24 }} />
 
-      <Section wide={ctx.wide} title="שמירה ואבטחה" desc="איפה המידע נשמר ומי יכול לפתוח אותו.">
+      <Section wide={ctx.wide} flush title="שמירה ואבטחה" desc="איפה המידע נשמר ומי יכול לפתוח אותו.">
         <Row icon={<FolderOpen size={18} />} title={vault.isFolder() ? `תיקייה ״${folder}״` : folder} desc={vault.isFolder() ? 'כאן נשמרים המטופלים, הסריקות והטבלאות. כל שינוי נשמר מיד.' : 'המידע נשמר מוצפן בדפדפן, במכשיר הזה בלבד.'}>
           {vault.isFolder() && vault.canPickFolder() && <Button onClick={move}>העברה לתיקייה אחרת</Button>}
         </Row>
+        <Divider />
         <ChangePassword toast={toast} />
+        <Divider />
         <Row icon={<Lock size={18} />} title="נעילה אוטומטית" desc={`הכלי ננעל אחרי ${s.lockMinutes} דקות בלי שימוש.`}>
           <select aria-label="נעילה אוטומטית אחרי" value={s.lockMinutes} onChange={(e) => set({ lockMinutes: Number(e.target.value) })} style={{ height: 40, borderRadius: 12, border: 'none', background: c.sub, padding: '0 12px', fontSize: 14, fontWeight: 500, color: c.ink, cursor: 'pointer' }}>
             {[5, 15, 30, 60].map((m) => (
@@ -220,17 +222,20 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   )
 }
 
-function Section({ title, desc, wide, children }: { title: string; desc: string; wide: boolean; children: React.ReactNode }) {
+/** סעיף: כותרת והסבר מימין, ומשמאל משטח לבן אחד שמקבץ את הפקדים. הסעיפים מופרדים בקו */
+function Section({ title, desc, wide, flush, children }: { title: string; desc: string; wide: boolean; flush?: boolean; children: React.ReactNode }) {
   return (
-    <Card style={{ padding: wide ? 32 : 24, display: 'grid', gridTemplateColumns: wide ? '280px minmax(0, 560px)' : '1fr', gap: wide ? 48 : 16 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <section aria-label={title} style={{ display: 'grid', gridTemplateColumns: wide ? '280px minmax(0, 560px)' : '1fr', gap: wide ? 48 : 16, padding: wide ? '32px 0' : '24px 0', borderTop: `1px solid ${c.line}` }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{title}</h2>
-        <p style={{ margin: 0, fontSize: 14, color: c.ink3, lineHeight: 1.5 }}>{desc}</p>
+        <p style={{ margin: 0, fontSize: 14, color: c.ink3, lineHeight: 1.6 }}>{desc}</p>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>{children}</div>
-    </Card>
+      <div style={{ background: c.surface, borderRadius: 20, boxShadow: lift, padding: flush ? 8 : 24, display: 'flex', flexDirection: 'column', gap: flush ? 0 : 20, minWidth: 0 }}>{children}</div>
+    </section>
   )
 }
+
+const Divider = () => <div aria-hidden style={{ height: 1, background: c.line, margin: '0 16px' }} />
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -250,7 +255,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 
 function Row({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children?: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: 16 }}>
       <span style={{ width: 40, height: 40, borderRadius: 14, background: c.primarySoft, color: c.primary, display: 'grid', placeItems: 'center', flex: 'none' }}>{icon}</span>
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>{title}</div>
@@ -281,12 +286,12 @@ function ChangePassword({ toast }: { toast: (t: string) => void }) {
     toast('הסיסמה הוחלפה. מעכשיו פותחים את הכלי בסיסמה החדשה.')
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <Row icon={<KeyRound size={18} />} title="סיסמה" desc="המידע מוצפן בסיסמה. אין דרך לשחזר סיסמה שנשכחה.">
         {!open && <Button onClick={() => setOpen(true)}>שינוי סיסמה</Button>}
       </Row>
       {open && (
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, background: c.sub, borderRadius: 12 }}>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, margin: '0 16px 16px', background: c.sub, borderRadius: 16 }}>
           <Field label="הסיסמה הנוכחית" type="password" value={cur} onChange={(v) => (setCur(v), setErr(undefined))} autoFocus />
           <Field label="סיסמה חדשה" type="password" value={next} onChange={(v) => (setNext(v), setErr(undefined))} hint="לפחות 8 תווים" />
           <Field label="הקלדה חוזרת של הסיסמה החדשה" type="password" value={next2} onChange={(v) => (setNext2(v), setErr(undefined))} />
