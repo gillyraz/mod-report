@@ -240,7 +240,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
                 {repChanged ? '. הנתונים השתנו מאז, וכדאי להפיק אותה מחדש.' : notIn > 0 ? `. ${notIn === 1 ? 'מטופל מוכן אחד לא נכלל' : `${notIn} מטופלים מוכנים לא נכללו`} בה.` : ''}
               </span>
               {eligible.length > 0 && (
-                <Button kind="ghost" icon={<FileOutput size={18} />} onClick={() => startSelect(repChanged || !notIn ? rep.ids : undefined)} style={{ color: 'inherit', fontWeight: 600 }}>
+                <Button kind="ghost" icon={<FileOutput size={18} />} onClick={() => startSelect(rep.ids)} style={{ color: 'inherit', fontWeight: 600 }}>
                   הפקה מחדש של הטבלה
                 </Button>
               )}
@@ -347,6 +347,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             ctx={ctx}
             cols={COLS}
             flash={flash === p.id}
+            report={rep ? { at: rep.at, has: rep.ids.includes(p.id) } : undefined}
             select={selecting ? { on: picked.has(p.id), can: canReport(p.id), toggle: () => toggle(p.id) } : undefined}
             scan={scans.find((x) => x.id === entries[p.id]?.scanId)}
             onAttach={() => {
@@ -482,6 +483,7 @@ function Row({
   ctx,
   cols,
   flash,
+  report,
   select,
   scan,
   onAttach,
@@ -493,6 +495,7 @@ function Row({
   ctx: Ctx
   cols: string
   flash: boolean
+  report?: { at: number; has: boolean }
   select?: { on: boolean; can: boolean; toggle: () => void }
   scan: Scan | undefined
   onAttach: () => void
@@ -508,11 +511,18 @@ function Row({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, fontSize: 16 }}>{p.name}</span>
-        {has && scan && (
+        {has && scan && (!report ? (
           <Badge tone="ok">
             <CheckCircle2 size={14} /> מוכן
           </Badge>
-        )}
+        ) : report.has ? (
+          <Badge tone="ok">
+            <CheckCircle2 size={14} /> בטבלה מ-{new Date(report.at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
+          </Badge>
+        ) : (
+          <Badge tone="warn">מוכן, לא בטבלה</Badge>
+        ))}
+        {report?.has && !(has && scan) && <Badge tone="muted">היה בטבלה</Badge>}
         {has && !scan && <Badge tone="warn">חסרה סריקה</Badge>}
         {!has && scan && <Badge tone="warn">יש סריקה, חסרים מפגשים</Badge>}
         {dim && !has && <span style={{ fontSize: 13, color: c.ink2 }}>אין מפגשים החודש</span>}
