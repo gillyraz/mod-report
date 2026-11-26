@@ -69,7 +69,7 @@ export default function App() {
     setToastText({ text: t, action })
     window.clearTimeout(timer.current)
     // הודעה עם פעולה נשארת יותר זמן, כדי שיהיה זמן ללחוץ
-    timer.current = window.setTimeout(() => setToastText(null), action ? 6000 : 2800)
+    timer.current = window.setTimeout(() => setToastText(null), action ? 6000 : 4000)
   }, [])
 
   if (!data) return null

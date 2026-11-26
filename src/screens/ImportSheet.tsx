@@ -35,7 +35,7 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
     const now = Date.now()
     const add: Patient[] = good.map((r, i) => ({ id: uid(), name: r.name, fileNo: r.fileNo, referralNo: r.referralNo, rate: r.rate, addedAt: now + i }))
     setData((d) => ({ ...d, patients: [...d.patients, ...add] }))
-    toast(add.length === 1 ? 'מטופל אחד נוסף לרשימה' : `${add.length} מטופלים נוספו לרשימה`)
+    toast(add.length === 1 ? 'מטופל אחד נוסף. עכשיו מזינים מפגשים ומצרפים סריקה.' : `${add.length} מטופלים נוספו. עכשיו מזינים מפגשים ומצרפים סריקות.`)
     onDone?.(add.map((p) => p.id))
     onClose()
   }
@@ -134,7 +134,10 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
             <Group tone="warn" title={bad.length === 1 ? 'שורה אחת לא תיכנס' : `${bad.length} שורות לא ייכנסו`} rows={bad} />
           )}
           {good.length > 0 ? (
-            <Group tone="ok" title={good.length === 1 ? 'מטופל אחד ייכנס לרשימה' : `${good.length} מטופלים ייכנסו לרשימה`} rows={good} />
+            <Group tone="ok" title={good.length === 1 ? 'מטופל אחד יתווסף לרשימת המטופלים' : `${good.length} מטופלים יתווספו לרשימת המטופלים`} rows={good} />
+          ) : null}
+          {good.length > 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: c.ink2, lineHeight: 1.6 }}>הם עוד לא מוכנים לדיווח. אחרי ההוספה מזינים לכל מטופל את מספר המפגשים של החודש ומצרפים את הטופס הסרוק, ואז הוא עובר ל״מוכנים לדיווח״.</p>
           ) : (
             <p style={{ margin: 0, fontSize: 14, color: c.ink2 }}>אין בקובץ מטופלים חדשים להוספה. אפשר לתקן את הקובץ ולבחור אותו שוב.</p>
           )}

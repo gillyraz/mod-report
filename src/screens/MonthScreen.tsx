@@ -182,9 +182,18 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   useEffect(() => {
     const el = heroRef.current
     if (!el || !wide) return setCompact(false)
-    const io = new IntersectionObserver(([e]) => setCompact(e.boundingClientRect.top < headerH - 8), { rootMargin: `-${headerH}px 0px 0px 0px`, threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] })
-    io.observe(el)
-    return () => io.disconnect()
+    // נמדד ישירות בכל גלילה ושינוי גודל, כדי שהפס לא ייתקע פתוח אחרי גלילה אוטומטית או מעבר ממסך הפתיחה
+    let raf = 0
+    const check = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => setCompact(el.isConnected && el.getBoundingClientRect().top < headerH - 8))
+    }
+    check()
+    addEventListener('scroll', check, { passive: true })
+    addEventListener('resize', check)
+    const ro = new ResizeObserver(check)
+    ro.observe(document.body)
+    return () => (cancelAnimationFrame(raf), removeEventListener('scroll', check), removeEventListener('resize', check), ro.disconnect())
   }, [wide, headerH, patients.length > 0])
 
   // אין מטופלים להציג בחודש הזה (גם לא מטופל בארכיון שיש לו נתונים בחודש)
@@ -217,7 +226,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     </>
   )
 
-  const COLS = `${selecting ? '40px ' : ''}minmax(240px, 1fr) 120px 120px 152px 176px`
+  const COLS = `${selecting ? '40px ' : ''}minmax(200px, 1fr) 120px 120px minmax(104px, 152px) 176px`
 
   const glass: CSSProperties = { padding: '16px 20px', borderRadius: 16, background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 2px rgba(16,24,40,0.04)', minWidth: wide ? 184 : 0, flex: wide ? '0 0 auto' : '1 1 140px' }
   const inner: CSSProperties = { position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', minHeight: 52, borderRadius: 14, background: 'rgba(255,255,255,0.82)', fontSize: 14 }
@@ -351,7 +360,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
   const colHead = (first: boolean, ready: boolean) =>
     wide && (
-      <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 24, alignItems: 'center', padding: '0 24px 8px', fontSize: 12, color: c.ink3, fontWeight: 500 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 'clamp(12px, 1.6vw, 24px)', alignItems: 'center', padding: '0 24px 8px', fontSize: 12, color: c.ink3, fontWeight: 500 }}>
         {selecting &&
           (ready ? (
             <Check4
@@ -692,7 +701,7 @@ function Row({
 
   if (wide)
     return (
-      <div id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 24, alignItems: 'center', padding: '12px 24px', minHeight: 80, ...look }}>
+      <div id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 'clamp(12px, 1.6vw, 24px)', alignItems: 'center', padding: '12px 24px', minHeight: 80, ...look }}>
         {box}
         {who}
         <Stepper hideLabel label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
