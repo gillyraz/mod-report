@@ -119,7 +119,7 @@ export function Field({
   dirLtr?: boolean
 }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <span style={{ fontSize: 14, fontWeight: 500, color: c.ink }}>{label}</span>
       <span style={{ position: 'relative', display: 'flex' }}>
         <input
@@ -131,6 +131,7 @@ export function Field({
           dir={dirLtr ? 'ltr' : undefined}
           style={{
             flex: 1,
+            minWidth: 0,
             height: 48,
             padding: suffix ? '0 16px 0 40px' : '0 16px',
             borderRadius: 8,
