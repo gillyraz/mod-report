@@ -319,9 +319,9 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
   // פס מצומצם: כשהכותרת וכרטיס הסיכום נגללים החוצה, החודש, הסכומים והפעולות נשארים למעלה
   const compactBar = wide && compact && (
-    <div style={{ position: 'fixed', top: headerH + 12, insetInline: 0, zIndex: 15, pointerEvents: 'none', animation: `drop 320ms ${EASE}` }}>
+    <div style={{ position: 'fixed', top: headerH, insetInline: 0, zIndex: 15, padding: '12px 0', background: c.bg, backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', animation: `drop 320ms ${EASE}` }}>
       <div style={{ maxWidth: 1184, margin: '0 auto', padding: '0 32px' }}>
-        <div role="region" aria-label="סיכום החודש מצומצם" style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 20, height: 64, padding: '0 12px', paddingInlineStart: 20, borderRadius: 18, background: 'rgba(255,255,255,0.86)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 0 0 1px rgba(69,102,232,0.10), 0 12px 28px -12px rgba(16,24,40,0.18)' }}>
+        <div role="region" aria-label="סיכום החודש מצומצם" style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 20, height: 64, padding: '0 12px', paddingInlineStart: 20, borderRadius: 18, background: c.surface, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 0 0 1px rgba(69,102,232,0.10), 0 12px 28px -12px rgba(16,24,40,0.18)' }}>
           <span style={{ fontWeight: 600, fontSize: 16 }}>החודש</span>
           <MonthSwitcher month={month} setMonth={setMonth} disabled={selecting} compact />
           <span style={{ width: 1, height: 28, background: c.line }} />
@@ -426,7 +426,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       {compactBar}
 
       {/* כותרת הרשימה: נשארת במקום בגלילה */}
-      <div style={{ position: wide ? 'sticky' : 'static', top: headerH + (compact ? 88 : 0), zIndex: 10, background: wide ? 'rgba(246,248,253,0.88)' : 'transparent', backdropFilter: wide ? 'blur(10px)' : undefined, paddingTop: wide ? 16 : 0, paddingBottom: wide ? 16 : 0, transition: `top 320ms ${EASE}`, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ position: wide ? 'sticky' : 'static', top: headerH + (compact ? 88 : 0), zIndex: 10, background: wide ? c.bg : 'transparent', backdropFilter: wide ? 'blur(10px)' : undefined, paddingTop: wide ? 16 : 0, paddingBottom: wide ? 16 : 0, transition: `top 320ms ${EASE}`, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, whiteSpace: 'nowrap' }}>
           מטופלים <span style={{ color: c.ink4, fontWeight: 400, fontVariantNumeric: 'tabular-nums' }}>{q ? `${shown.length} מתוך ${patients.length}` : patients.length}</span>
         </h2>
