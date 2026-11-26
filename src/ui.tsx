@@ -4,23 +4,31 @@ import { Minus, Plus, X } from 'lucide-react'
 export const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
 export const c = {
-  bg: '#F4F5F7',
+  bg: '#F4F7FC',
   surface: '#FFFFFF',
-  sub: '#F0F2F5',
-  ink: '#1A1D23',
-  ink2: '#5B6270',
-  ink3: '#6E7584',
-  line: '#E3E6EB',
-  primary: '#1F3A5F',
-  primaryHover: '#16304F',
+  sub: '#EEF2F8',
+  group: '#E9EEF6',
+  ink: '#14181F',
+  ink2: '#4B5563',
+  ink3: '#6B7280',
+  ink4: '#9AA1AC',
+  line: '#E2E8F1',
+  primary: '#1B365D',
+  primaryHover: '#152C4D',
+  primary2: '#24497C',
   focus: '#2F6FEB',
-  okBg: '#E5F4EC',
-  ok: '#17794A',
-  warnBg: '#FFF3DC',
-  warn: '#9A5B00',
+  okBg: '#E3F3EA',
+  okSurf: '#EDF6F1',
+  ok: '#13734A',
+  warnBg: '#FFF1D6',
+  warnSoft: '#FFF6E5',
+  warn: '#8F5600',
   dangerBg: '#FDECEA',
   danger: '#B3261E',
 }
+
+/** צל רך לכרטיסים: מסגרת דקה ועומק קל */
+export const lift = '0 0 0 1px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.05)'
 
 export function useWide(min = 900) {
   const q = `(min-width: ${min}px)`
@@ -65,7 +73,7 @@ export function Button({
     height: 40,
     padding: children ? '0 16px' : 0,
     width: full ? '100%' : children ? undefined : 40,
-    borderRadius: 8,
+    borderRadius: 10,
     fontSize: 15,
     fontWeight: 500,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -75,8 +83,8 @@ export function Button({
     whiteSpace: 'nowrap',
   }
   const kinds: Record<BtnKind, CSSProperties> = {
-    primary: { background: hover && !disabled ? c.primaryHover : c.primary, color: '#fff' },
-    secondary: { background: hover && !disabled ? c.sub : c.surface, color: c.ink, borderColor: c.line },
+    primary: { background: hover && !disabled ? c.primaryHover : c.primary, color: '#fff', boxShadow: '0 1px 2px rgba(16,24,40,0.12), inset 0 1px 0 rgba(255,255,255,0.08)' },
+    secondary: { background: hover && !disabled ? c.sub : c.surface, color: c.ink, borderColor: '#DCE3EE', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' },
     ghost: { background: hover && !disabled ? c.sub : 'transparent', color: c.ink },
     danger: { background: hover && !disabled ? c.dangerBg : 'transparent', color: c.danger },
   }
@@ -134,8 +142,8 @@ export function Field({
             minWidth: 0,
             height: 48,
             padding: suffix ? '0 16px 0 40px' : '0 16px',
-            borderRadius: 8,
-            border: `1px solid ${c.line}`,
+            borderRadius: 10,
+            border: '1px solid #DCE3EE',
             background: c.surface,
             fontSize: 16,
             color: c.ink,
@@ -155,21 +163,21 @@ export function Field({
 
 export function Stepper({ value, onChange, label, hideLabel }: { value: number; onChange: (n: number) => void; label: string; hideLabel?: boolean }) {
   const btn: CSSProperties = {
-    width: 40,
+    width: 36,
     height: 40,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     border: 'none',
     background: 'transparent',
-    color: c.ink,
+    color: c.ink2,
     cursor: 'pointer',
-    borderRadius: 8,
+    borderRadius: 10,
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {!hideLabel && <span style={{ fontSize: 13, color: c.ink2 }}>{label}</span>}
-      <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', background: c.surface, border: `1px solid ${c.line}`, borderRadius: 8, height: 40 }}>
+      <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', background: c.sub, borderRadius: 10, height: 40, alignSelf: 'flex-start' }}>
         <button style={btn} aria-label={`הוספה: ${label}`} onClick={() => onChange(value + 1)}>
           <Plus size={16} />
         </button>
@@ -178,9 +186,9 @@ export function Stepper({ value, onChange, label, hideLabel }: { value: number; 
           inputMode="numeric"
           value={value}
           onChange={(e) => onChange(Math.max(0, parseInt(e.target.value.replace(/\D/g, '') || '0', 10)))}
-          style={{ width: 40, height: 38, border: 'none', textAlign: 'center', fontSize: 16, fontWeight: 600, color: c.ink, background: 'transparent', fontVariantNumeric: 'tabular-nums' }}
+          style={{ width: 36, height: 38, border: 'none', textAlign: 'center', fontSize: 16, fontWeight: 600, color: value === 0 ? c.ink4 : c.ink, background: 'transparent', fontVariantNumeric: 'tabular-nums' }}
         />
-        <button style={{ ...btn, color: value === 0 ? c.ink3 : c.ink }} aria-label={`הפחתה: ${label}`} disabled={value === 0} onClick={() => onChange(Math.max(0, value - 1))}>
+        <button style={{ ...btn, color: value === 0 ? c.ink4 : c.ink2, cursor: value === 0 ? 'default' : 'pointer' }} aria-label={`הפחתה: ${label}`} disabled={value === 0} onClick={() => onChange(Math.max(0, value - 1))}>
           <Minus size={16} />
         </button>
       </div>
@@ -224,7 +232,7 @@ export function Sheet({ title, onClose, children, footer, wide }: { title: strin
           background: c.bg,
           width: desk ? (wide ? 760 : 520) : '100%',
           maxHeight: desk ? '88vh' : '92vh',
-          borderRadius: desk ? 16 : '16px 16px 0 0',
+          borderRadius: desk ? 20 : '20px 20px 0 0',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -232,8 +240,8 @@ export function Sheet({ title, onClose, children, footer, wide }: { title: strin
           boxShadow: '0 24px 64px rgba(16,22,34,0.24)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: c.surface, borderBottom: `1px solid ${c.line}` }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{title}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px 16px 16px', paddingInlineStart: 24, background: c.surface, borderBottom: `1px solid ${c.line}` }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: -0.2 }}>{title}</h2>
           <Button kind="ghost" title="סגירה" icon={<X size={20} />} onClick={onClose} />
         </div>
         <div style={{ padding: 24, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
@@ -244,14 +252,14 @@ export function Sheet({ title, onClose, children, footer, wide }: { title: strin
 }
 
 export function Card({ children, style, ref, id }: { children: ReactNode; style?: CSSProperties; ref?: React.Ref<HTMLDivElement>; id?: string }) {
-  return <div ref={ref} id={id} style={{ background: c.surface, borderRadius: 12, border: `1px solid ${c.line}`, ...style }}>{children}</div>
+  return <div ref={ref} id={id} style={{ background: c.surface, borderRadius: 16, boxShadow: lift, ...style }}>{children}</div>
 }
 
 export function Toast({ t, onDone, lift }: { t: { text: string; action?: { label: string; run: () => void } } | null; onDone: () => void; lift?: boolean }) {
   if (!t) return null
   return (
     <div role="status" style={{ position: 'fixed', bottom: lift ? 'calc(80px + env(safe-area-inset-bottom))' : 24, insetInline: 0, display: 'flex', justifyContent: 'center', zIndex: 60, pointerEvents: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: c.ink, color: '#fff', padding: t.action ? '8px 8px 8px 16px' : '12px 16px', paddingInlineStart: 16, borderRadius: 8, fontSize: 15, animation: `rise 320ms ${EASE}`, maxWidth: 'calc(100% - 32px)', pointerEvents: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: c.ink, color: '#fff', padding: t.action ? '8px 8px 8px 16px' : '12px 16px', paddingInlineStart: 16, borderRadius: 12, boxShadow: '0 12px 32px rgba(16,24,40,0.24)', fontSize: 15, animation: `rise 320ms ${EASE}`, maxWidth: 'calc(100% - 32px)', pointerEvents: 'auto' }}>
         <span>{t.text}</span>
         {t.action && (
           <button

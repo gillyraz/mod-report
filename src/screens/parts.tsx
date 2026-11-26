@@ -1,8 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
 import type { Ctx } from '../App'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { Button, c } from '../ui'
+import { Button, c, lift } from '../ui'
 import { monthLabel, shiftMonth } from '../model'
 
 export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
@@ -20,7 +19,7 @@ export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: Reac
 export function MonthSwitcher({ month, setMonth, disabled }: { month: string; setMonth: (m: string) => void; disabled?: boolean }) {
   const why = disabled ? 'אי אפשר להחליף חודש באמצע הבחירה. מסיימים או מבטלים קודם.' : undefined
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: c.surface, border: `1px solid ${c.line}`, borderRadius: 8, height: 40 }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: c.surface, boxShadow: lift, borderRadius: 10, height: 40 }}>
       <Button kind="ghost" title={why ?? 'החודש הקודם'} disabled={disabled} icon={<ChevronRight size={18} />} onClick={() => setMonth(shiftMonth(month, -1))} style={{ height: 38 }} />
       <span style={{ minWidth: 112, textAlign: 'center', fontWeight: 600, fontSize: 15 }} aria-live="polite">
         {monthLabel(month)}
@@ -31,33 +30,31 @@ export function MonthSwitcher({ month, setMonth, disabled }: { month: string; se
 }
 
 /**
- * פס העמוד: כותרת, פרטים ופעולות של העמוד הנוכחי, באותו מבנה בכל העמודים.
- * בדסקטופ הוא יושב בפס העליון הקבוע, ובנייד בראש העמוד.
+ * ראש העמוד: כותרת גדולה, שורת הסבר ופעולות. אותו מבנה ואותו מקום בכל העמודים.
  */
-export function PageBar({ ctx, title, lead, middle, actions }: { ctx: Ctx; title: string; lead?: ReactNode; middle?: ReactNode; actions?: ReactNode }) {
-  const { wide, pageSlot } = ctx
-  if (wide && pageSlot)
-    return createPortal(
-      <div style={{ borderTop: `1px solid ${c.line}` }}>
-        <div style={{ maxWidth: 1184, margin: '0 auto', minHeight: 64, padding: '12px 32px', display: 'flex', alignItems: 'center', columnGap: 24, rowGap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: '0 0 auto' }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{title}</h1>
+export function PageBar({ ctx, title, sub, lead, actions }: { ctx: Ctx; title: string; sub?: ReactNode; lead?: ReactNode; actions?: ReactNode }) {
+  const { wide } = ctx
+  if (wide)
+    return (
+      <div style={{ paddingTop: 40, display: 'flex', alignItems: 'flex-end', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, minHeight: 40 }}>
+            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.15 }}>{title}</h1>
             {lead}
           </div>
-          <div style={{ flex: '1 1 420px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 14, color: c.ink2 }}>{middle}</div>
-          {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>{actions}</div>}
+          {sub && <p style={{ margin: 0, fontSize: 15, color: c.ink3, minHeight: 21 }}>{sub}</p>}
         </div>
-      </div>,
-      pageSlot,
+        <span style={{ flex: 1 }} />
+        {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>{actions}</div>}
+      </div>
     )
-  if (wide) return null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>{title}</h1>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: -0.4 }}>{title}</h1>
         {lead}
       </div>
-      {middle && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14, color: c.ink2 }}>{middle}</div>}
+      {sub && <p style={{ margin: 0, fontSize: 14, color: c.ink3 }}>{sub}</p>}
       {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
     </div>
   )
@@ -82,3 +79,17 @@ export function useNewPatientShortcut(open: () => void, enabled = true) {
     return () => window.removeEventListener('keydown', on)
   }, [])
 }
+
+const TONES = ['#E3E9F3', '#E9E4F3', '#E1EEE8', '#F3E8E1', '#E8EEE0', '#F1E3E8']
+/** עיגול עם ראשי התיבות של המטופל, בגוון קבוע לכל שם */
+export function Avatar({ name }: { name: string }) {
+  const parts = name.trim().split(/\s+/)
+  const ini = (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  const tone = TONES[[...name].reduce((a, ch) => a + ch.charCodeAt(0), 0) % TONES.length]
+  return (
+    <span aria-hidden style={{ flex: '0 0 40px', height: 40, borderRadius: 999, background: tone, color: '#2A3446', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 600 }}>
+      {ini}
+    </span>
+  )
+}
+

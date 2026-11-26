@@ -1,14 +1,14 @@
 import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, Check, CheckCircle2, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, UserPlus, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, ChevronLeft, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
-import { Badge, Button, c, Card, EASE, Stepper } from '../ui'
+import { Badge, Button, c, Card, EASE, lift, Stepper } from '../ui'
 import { calc, ils, monthLabel, rateOf, refOf, setVatFrom, uid, vatOf, type Entry, type Patient, type Scan } from '../model'
 import { makeThumb } from '../pdf'
 import AssignSheet from './AssignSheet'
 import ScanSheet from './ScanSheet'
-import { MonthSwitcher, PageBar } from './parts'
+import { Avatar, MonthSwitcher, PageBar } from './parts'
 import PatientForm from './PatientForm'
 import ReportSheet from './ReportSheet'
 
@@ -51,7 +51,6 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id)
   const eligible = patients.filter((p) => canReport(p.id))
   const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], vatOf(data, month)).total, 0)
-  const pct = patients.length ? eligible.length / patients.length : 0
   // הטבלה של החודש: מתי נשמרה, ואם הנתונים השתנו מאז
   const sumOf = (ids: string[]) => ids.reduce((a, id) => {
     const p = data.patients.find((x) => x.id === id)
@@ -165,11 +164,23 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
   const importForm = importing && <ImportSheet ctx={ctx} onClose={() => setImporting(false)} />
 
+  // מטופל שעבר מקבוצה לקבוצה (הפך למוכן או הפסיק להיות מוכן) מודגש לרגע, כדי שהעין תעקוב אחריו
+  const readyKey = eligible.map((p) => p.id).join(',')
+  const prevReady = useRef<{ month: string; ids: Set<string> } | null>(null)
+  useEffect(() => {
+    const now = new Set(readyKey ? readyKey.split(',') : [])
+    const prev = prevReady.current
+    prevReady.current = { month, ids: now }
+    if (!prev || prev.month !== month) return
+    const moved = [...now].find((id) => !prev.ids.has(id)) ?? [...prev.ids].find((id) => !now.has(id))
+    if (moved && document.getElementById(`row-${moved}`)) setFlash(moved)
+  }, [readyKey, month])
+
   // אין מטופלים להציג בחודש הזה (גם לא מטופל בארכיון שיש לו נתונים בחודש)
   if (patients.length === 0) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: wide ? 32 : 0 }}>
-        {wide && <PageBar ctx={ctx} title="החודש" />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: wide ? 40 : 24 }}>
+        {wide && <PageBar ctx={ctx} title="החודש" sub="מתחילים ברשימת המטופלים, ואחר כך מסכמים את החודש." />}
         <Welcome ctx={ctx} archived={data.patients.filter((p) => p.archived).length} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} />
         {addForm}
         {importForm}
@@ -177,23 +188,12 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     )
   }
 
-  const status = (
-    <>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
-        <Ring pct={pct} />
-        <span>
-          <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
-            {eligible.length} מתוך {patients.length}
-          </b>{' '}
-          מוכנים לדיווח
-        </span>
-      </span>
-      <span style={{ whiteSpace: 'nowrap' }}>
-        סה״כ החודש <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
-      </span>
-      <VatInline ctx={ctx} />
-    </>
-  )
+  const vat = vatOf(data, month)
+  const readyTotal = eligible.reduce((a, p) => a + calc(p, entries[p.id], vat).total, 0)
+  const rest = patients.length - eligible.length
+  const readyList = shown.filter((p) => canReport(p.id))
+  const needList = shown.filter((p) => !canReport(p.id))
+  const soft = 'rgba(255,255,255,0.72)'
 
   const hint = 'אפשר לסמן רק מטופלים עם מפגשים וסריקה מצורפת'
   const selectActions = (
@@ -207,15 +207,153 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     </>
   )
 
-  const COLS = `${selecting ? '40px ' : ''}minmax(180px, 1.6fr) 136px 136px minmax(200px, 1.4fr) 168px`
+  const COLS = `${selecting ? '40px ' : ''}minmax(240px, 1fr) 120px 120px 152px 176px`
+  const stripPad = wide ? '12px 32px' : '12px 16px'
+
+  const hero = (
+    <section aria-label="סיכום החודש" style={{ marginTop: wide ? 24 : 0, marginBottom: wide ? 16 : 0, borderRadius: 20, overflow: 'hidden', boxShadow: '0 8px 20px -10px rgba(27,54,93,0.45)' }}>
+      <div style={{ background: `linear-gradient(135deg, ${c.primary} 0%, ${c.primary2} 100%)`, color: '#fff', padding: wide ? 32 : 24, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 32, rowGap: 24 }}>
+        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+          <div style={{ fontSize: 14, color: soft, fontWeight: 500 }}>מוכן לדיווח החודש</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', columnGap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+            <span style={{ fontSize: wide ? 48 : 36, fontWeight: 600, letterSpacing: -1.2, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>{ils(readyTotal)}</span>
+            <span style={{ color: soft, fontSize: 16 }}>{eligible.length === 1 ? 'מטופל אחד' : `${eligible.length} מטופלים`}</span>
+          </div>
+          <Segments n={eligible.length} t={patients.length} />
+          <div style={{ marginTop: 8, fontSize: 13, color: soft }}>
+            <b style={{ color: '#fff', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+              {eligible.length} מתוך {patients.length}
+            </b>{' '}
+            מטופלים מוכנים.{rest > 0 ? ` ${rest === 1 ? 'מטופל אחד צריך' : `${rest} צריכים`} השלמה.` : ' כולם מוכנים.'}
+          </div>
+        </div>
+        {wide && <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.16)' }} />}
+        <div style={{ display: 'flex', gap: 40, flex: '0 0 auto', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 13, color: soft }}>סה״כ כל הטפסים</div>
+            <div style={{ fontSize: 22, fontWeight: 600, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: soft }}>מע״מ</div>
+            <div style={{ marginTop: 4 }}>
+              <VatInline ctx={ctx} />
+            </div>
+          </div>
+        </div>
+      </div>
+      {rep && !selecting && (
+        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: stripPad, minHeight: 56, background: repChanged ? c.warnSoft : c.okSurf, color: repChanged ? c.warn : c.ok, fontSize: 14 }}>
+          <span style={{ flex: '0 0 28px', height: 28, borderRadius: 8, background: repChanged ? c.warnBg : c.okBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {repChanged ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+          </span>
+          <span style={{ flex: 1, lineHeight: 1.5 }}>
+            <b style={{ fontWeight: 600 }}>הטבלה של {monthLabel(month)} נשמרה ב-{new Date(rep.at).toLocaleDateString('he-IL')}</b>
+            {' · '}
+            {rep.ids.length === 1 ? 'מטופל אחד' : `${rep.ids.length} מטופלים`}, {ils(rep.total)}
+            {repChanged ? '. הנתונים השתנו מאז, וכדאי להפיק אותה מחדש.' : notIn > 0 ? `. ${notIn === 1 ? 'מטופל מוכן אחד לא נכלל' : `${notIn} מטופלים מוכנים לא נכללו`} בה.` : ''}
+          </span>
+          {eligible.length > 0 && (
+            <Button kind="ghost" icon={<FileOutput size={18} />} onClick={() => startSelect(rep.ids)} style={{ color: 'inherit', fontWeight: 600, height: 36 }}>
+              הפקה מחדש של הטבלה
+            </Button>
+          )}
+        </div>
+      )}
+      {unassigned.length > 0 && !selecting && (
+        <button
+          onClick={() => setAssigning(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: stripPad, minHeight: 56, width: '100%', background: c.warnSoft, color: '#5C3800', border: 'none', borderTop: rep ? '1px solid rgba(143,86,0,0.12)' : 'none', fontSize: 14, cursor: 'pointer', textAlign: 'start', font: 'inherit' }}
+        >
+          <span style={{ flex: '0 0 28px', height: 28, borderRadius: 8, background: c.warnBg, color: c.warn, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileStack size={16} />
+          </span>
+          <span style={{ flex: 1, fontSize: 14 }}>
+            <b style={{ fontWeight: 600 }}>{unassigned.length === 1 ? 'סריקה אחת ממתינה' : `${unassigned.length} סריקות ממתינות`}</b>{' '}
+            <span style={{ color: c.warn }}>{unassigned.length === 1 ? 'ועדיין לא שויכה לאף מטופל' : 'ועדיין לא שויכו למטופלים'}</span>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600, fontSize: 14 }}>
+            {unassigned.length === 1 ? 'שיוך הסריקה למטופל' : 'שיוך הסריקות למטופלים'}
+            <ChevronLeft size={16} />
+          </span>
+        </button>
+      )}
+    </section>
+  )
+
+  const sortSelect = (
+    <select
+      aria-label="מיון המטופלים"
+      value={sort}
+      onChange={(e) => setSort(e.target.value as Sort)}
+      style={{ height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: c.ink, padding: '0 4px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+    >
+      <option value="added">לפי סדר ההוספה</option>
+      <option value="first">לפי שם פרטי</option>
+      <option value="last">לפי שם משפחה</option>
+    </select>
+  )
+
+  const colHead = (first: boolean, ready: boolean) =>
+    wide && (
+      <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 24, alignItems: 'center', padding: '0 24px 8px', fontSize: 12, color: c.ink3, fontWeight: 500 }}>
+        {selecting &&
+          (ready ? (
+            <Check4
+              checked={allOn}
+              mixed={!allOn && picked.size > 0}
+              disabled={!eligible.length}
+              label={allOn ? 'ביטול הסימון של כולם' : 'סימון כל המטופלים שאפשר לדווח'}
+              onChange={() => setPicked(allOn ? new Set() : new Set(eligible.map((p) => p.id)))}
+            />
+          ) : (
+            <span />
+          ))}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          מטופל
+          {first && (
+            <>
+              <span aria-hidden>·</span>
+              {sortSelect}
+            </>
+          )}
+        </span>
+        <span>מפגשים חתומים</span>
+        <span>ביטולים ללא הודעה</span>
+        <span>סה״כ לטופס</span>
+        <span style={{ textAlign: 'end' }}>טופס סרוק</span>
+      </div>
+    )
+
+  const rowOf = (p: Patient) => (
+    <Row
+      key={p.id}
+      p={p}
+      e={entries[p.id]}
+      ctx={ctx}
+      cols={COLS}
+      flash={flash === p.id}
+      report={rep ? { at: rep.at, has: rep.ids.includes(p.id) } : undefined}
+      select={selecting ? { on: picked.has(p.id), can: canReport(p.id), toggle: () => toggle(p.id) } : undefined}
+      scan={scans.find((x) => x.id === entries[p.id]?.scanId)}
+      onAttach={() => {
+        target.current = p.id
+        oneInput.current?.click()
+      }}
+      onView={(scan) => setViewScan({ scan, patient: p })}
+      onEntry={(fn) => setEntry(p.id, fn)}
+    />
+  )
+
+  const showReady = readyList.length > 0 || !q
+  const showNeed = needList.length > 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: wide ? 0 : 24 }}>
       <PageBar
         ctx={ctx}
         title="החודש"
+        sub="מזינים מפגשים, מצרפים סריקות ומפיקים את הטבלה החודשית."
         lead={<MonthSwitcher month={month} setMonth={setMonth} disabled={selecting} />}
-        middle={wide ? status : <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>{status}</div>}
         actions={
           <>
             <Button icon={<FileUp size={18} />} onClick={() => bulkInput.current?.click()} disabled={busy || selecting} style={{ flex: wide ? undefined : 1 }}>
@@ -228,136 +366,60 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         }
       />
 
-      {/* סריקות שממתינות לשיוך: מעל הרשימה, לא נשאר קבוע בגלילה */}
-      {((rep && !selecting) || (unassigned.length > 0 && !selecting)) && <div style={{ paddingTop: wide ? 24 : 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {rep && (
-            <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '8px 8px 8px 16px', paddingInlineStart: 16, background: repChanged ? c.warnBg : c.okBg, color: repChanged ? c.warn : c.ok, borderRadius: 12, fontSize: 15 }}>
-              {repChanged ? <AlertTriangle size={20} style={{ flex: '0 0 20px' }} /> : <CheckCircle2 size={20} style={{ flex: '0 0 20px' }} />}
-              <span style={{ flex: 1, lineHeight: 1.5 }}>
-                <b>הטבלה של {monthLabel(month)} נשמרה ב-{new Date(rep.at).toLocaleDateString('he-IL')}</b>
-                {' · '}
-                {rep.ids.length === 1 ? 'מטופל אחד' : `${rep.ids.length} מטופלים`}, {ils(rep.total)}
-                {repChanged ? '. הנתונים השתנו מאז, וכדאי להפיק אותה מחדש.' : notIn > 0 ? `. ${notIn === 1 ? 'מטופל מוכן אחד לא נכלל' : `${notIn} מטופלים מוכנים לא נכללו`} בה.` : ''}
-              </span>
-              {eligible.length > 0 && (
-                <Button kind="ghost" icon={<FileOutput size={18} />} onClick={() => startSelect(rep.ids)} style={{ color: 'inherit', fontWeight: 600 }}>
-                  הפקה מחדש של הטבלה
-                </Button>
-              )}
-            </div>
-          )}
-          {unassigned.length > 0 && !selecting && (<>
-          <button
-            onClick={() => setAssigning(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', width: '100%', background: c.warnBg, color: c.warn, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer', textAlign: 'start' }}
-          >
-            <FileStack size={20} />
-            <span style={{ flex: 1 }}>
-              {unassigned.length === 1 ? (<><b>סריקה אחת</b> ממתינה לשיוך למטופל</>) : (<><b>{unassigned.length} סריקות</b> ממתינות לשיוך למטופל</>)}
-            </span>
-            <span style={{ fontWeight: 600, textDecoration: 'underline' }}>{unassigned.length === 1 ? 'שיוך הסריקה' : 'שיוך הסריקות'}</span>
-          </button></>)}
-      </div>}
+      {hero}
 
-      {/* כותרת הרשימה וכותרות העמודות: נשארות במקום, רק השורות נגללות */}
-      <div style={{ position: wide ? 'sticky' : 'static', top: headerH, zIndex: 10, background: c.bg, paddingTop: wide ? 24 : 0, paddingBottom: 8, marginInline: wide ? -8 : 0, paddingInline: wide ? 8 : 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {(
-          <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {q ? `${shown.length} מתוך ${patients.length}` : patients.length}</span>
-              </h2>
-              <label style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Search size={16} style={{ position: 'absolute', insetInlineStart: 12, color: c.ink3, pointerEvents: 'none' }} />
-                <input
-                  type="search"
-                  aria-label="חיפוש מטופל לפי שם, מספר תיק או מספר הפנייה"
-                  placeholder="חיפוש לפי שם, תיק או הפנייה"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  style={{ width: 264, height: 36, borderRadius: 8, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 12px', paddingInlineStart: 36, fontSize: 14 }}
-                />
-              </label>
-              {!wide && <select
-                aria-label="מיון המטופלים"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as Sort)}
-                style={{ height: 32, borderRadius: 8, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 8px', fontSize: 14 }}
-              >
-                <option value="added">לפי סדר ההוספה</option>
-                <option value="first">לפי שם פרטי</option>
-                <option value="last">לפי שם משפחה</option>
-              </select>}
-            </div>
-            {!wide && (
-              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting} title="קיצור מקלדת: N" aria-keyshortcuts="N">
-              הוספת מטופל
-            </Button>)}
-          </div>
+      {/* כותרת הרשימה: נשארת במקום בגלילה */}
+      <div style={{ position: wide ? 'sticky' : 'static', top: headerH, zIndex: 10, background: c.bg, paddingTop: wide ? 16 : 0, paddingBottom: wide ? 16 : 0, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          מטופלים <span style={{ color: c.ink4, fontWeight: 400, fontVariantNumeric: 'tabular-nums' }}>{q ? `${shown.length} מתוך ${patients.length}` : patients.length}</span>
+        </h2>
+        <label style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: wide ? '0 0 296px' : '1 1 200px' }}>
+          <Search size={18} style={{ position: 'absolute', insetInlineStart: 12, color: c.ink4, pointerEvents: 'none' }} />
+          <input
+            type="search"
+            aria-label="חיפוש מטופל לפי שם, מספר תיק או מספר הפנייה"
+            placeholder="חיפוש לפי שם, תיק או הפנייה"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: '100%', height: 40, borderRadius: 10, border: 'none', boxShadow: '0 0 0 1px #DCE3EE', background: c.surface, color: c.ink, padding: '0 12px', paddingInlineStart: 40, fontSize: 14 }}
+          />
+        </label>
+        {!wide && (
+          <select aria-label="מיון המטופלים" value={sort} onChange={(e) => setSort(e.target.value as Sort)} style={{ height: 40, borderRadius: 10, border: 'none', boxShadow: '0 0 0 1px #DCE3EE', background: c.surface, color: c.ink, padding: '0 8px', fontSize: 14 }}>
+            <option value="added">לפי סדר ההוספה</option>
+            <option value="first">לפי שם פרטי</option>
+            <option value="last">לפי שם משפחה</option>
+          </select>
         )}
-        {wide && (
-          <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, alignItems: 'center', padding: '0 24px', fontSize: 13, color: c.ink2, fontWeight: 500 }}>
-            {selecting && (
-              <Check4
-                checked={allOn}
-                mixed={!allOn && picked.size > 0}
-                disabled={!eligible.length}
-                label={allOn ? 'ביטול הסימון של כולם' : 'סימון כל המטופלים שאפשר לדווח'}
-                onChange={() => setPicked(allOn ? new Set() : new Set(eligible.map((p) => p.id)))}
-              />
-            )}
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              מטופל
-              <select
-                aria-label="מיון המטופלים"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as Sort)}
-                style={{ height: 28, borderRadius: 6, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 4px', fontSize: 13 }}
-              >
-                <option value="added">לפי סדר ההוספה</option>
-                <option value="first">לפי שם פרטי</option>
-                <option value="last">לפי שם משפחה</option>
-              </select>
-            </span>
-            <span>מפגשים חתומים</span>
-            <span>ביטולים ללא הודעה</span>
-            <span>לכתוב בטופס</span>
-            {/* הכפתור צמוד לטבלה, מעל עמודת הסריקה */}
-            <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting} title="קיצור מקלדת: N" aria-keyshortcuts="N">
-              הוספת מטופל
-            </Button>
-            </span>
-          </div>
-        )}
+        <span style={{ flex: 1 }} />
+        <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting} title="קיצור מקלדת: N" aria-keyshortcuts="N">
+          הוספת מטופל
+        </Button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: selecting ? 120 : 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: selecting ? 120 : 0 }}>
         {q && !shown.length && (
-          <div style={{ padding: 24, background: c.sub, borderRadius: 12, fontSize: 15, color: c.ink2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ padding: 24, background: c.surface, boxShadow: lift, borderRadius: 16, fontSize: 15, color: c.ink2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <span>אין מטופל שמתאים ל״{q}״.</span>
             <Button kind="ghost" onClick={() => setQuery('')}>ניקוי החיפוש</Button>
           </div>
         )}
-        {shown.map((p) => (
-          <Row
-            key={p.id}
-            p={p}
-            e={entries[p.id]}
-            ctx={ctx}
-            cols={COLS}
-            flash={flash === p.id}
-            report={rep ? { at: rep.at, has: rep.ids.includes(p.id) } : undefined}
-            select={selecting ? { on: picked.has(p.id), can: canReport(p.id), toggle: () => toggle(p.id) } : undefined}
-            scan={scans.find((x) => x.id === entries[p.id]?.scanId)}
-            onAttach={() => {
-              target.current = p.id
-              oneInput.current?.click()
-            }}
-            onView={(scan) => setViewScan({ scan, patient: p })}
-            onEntry={(fn) => setEntry(p.id, fn)}
-          />
-        ))}
+        {showReady && (
+          <Group tone="ok" title="מוכנים לדיווח" count={readyList.length} sub="יש מפגשים וסריקה מצורפת" head={colHead(true, true)}>
+            {readyList.length ? (
+              readyList.map(rowOf)
+            ) : (
+              <div style={{ padding: '20px 24px', background: c.surface, borderRadius: 12, fontSize: 14, color: c.ink2, lineHeight: 1.5 }}>
+                עדיין אין מטופל מוכן לדיווח. מטופל נכנס לכאן כשיש לו מפגשים החודש וסריקה מצורפת של הטופס החתום.
+              </div>
+            )}
+          </Group>
+        )}
+        {showNeed && (
+          <Group tone="warn" title="צריכים השלמה" count={needList.length} sub="לא ייכנסו לדיווח עד שיושלמו" head={colHead(!showReady, false)}>
+            {needList.map(rowOf)}
+          </Group>
+        )}
       </div>
 
       {/* נייד: פעולות הבחירה בפס תחתון */}
@@ -505,80 +567,96 @@ function Row({
   const { wide, data } = ctx
   const r = calc(p, e, vatOf(data, ctx.month))
   const has = r.sessions > 0
+  const ready = has && !!scan
   const dim = select && !select.can
+  const need = ready ? null : has ? 'חסרה סריקה של הטופס החתום' : scan ? 'לא הוזנו מפגשים החודש' : 'לא הוזנו מפגשים ואין סריקה'
+  const meta = `תיק ${p.fileNo} · הפנייה ${refOf(p, e)} · ${ils(rateOf(p, e))} למפגש`
 
   const who = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, fontSize: 16 }}>{p.name}</span>
-        {has && scan && (!report ? (
-          <Badge tone="ok">
-            <CheckCircle2 size={14} /> מוכן
-          </Badge>
-        ) : report.has ? (
-          <Badge tone="ok">
-            <CheckCircle2 size={14} /> בטבלה מ-{new Date(report.at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
-          </Badge>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+      <Avatar name={p.name} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, fontSize: 16 }}>{p.name}</span>
+          {ready && report && (report.has ? (
+            <Badge tone="ok">
+              <CheckCircle2 size={14} /> בטבלה מ-{new Date(report.at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}
+            </Badge>
+          ) : (
+            <Badge tone="warn">מוכן, לא בטבלה</Badge>
+          ))}
+          {report?.has && !ready && <Badge tone="muted">היה בטבלה</Badge>}
+        </div>
+        {need ? (
+          <span title={meta} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: c.warn, fontWeight: 500 }}>
+            <AlertCircle size={14} style={{ flex: '0 0 14px' }} />
+            {need}
+          </span>
         ) : (
-          <Badge tone="warn">מוכן, לא בטבלה</Badge>
-        ))}
-        {report?.has && !(has && scan) && <Badge tone="muted">היה בטבלה</Badge>}
-        {has && !scan && <Badge tone="warn">חסרה סריקה</Badge>}
-        {!has && scan && <Badge tone="warn">יש סריקה, חסרים מפגשים</Badge>}
-        {dim && !has && <span style={{ fontSize: 13, color: c.ink2 }}>אין מפגשים החודש</span>}
+          <span style={{ fontSize: 13, color: c.ink3, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={meta}>{meta}</span>
+        )}
       </div>
-      <span style={{ fontSize: 13, color: c.ink2, fontVariantNumeric: 'tabular-nums' }}>
-        תיק {p.fileNo} · הפנייה {refOf(p, e)} · {ils(rateOf(p, e))} למפגש
-      </span>
     </div>
   )
 
-  const sums = (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: has ? c.sub : 'transparent', border: has ? 'none' : `1px dashed ${c.line}`, borderRadius: 8, padding: '8px 16px', transition: `background 240ms ${EASE}` }}>
-      <Num label="מע״מ" value={has ? ils(r.vat) : '—'} />
-      <Num label="סה״כ" value={has ? ils(r.total) : '—'} strong />
+  const sums = has ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.2 }}>{ils(r.total)}</span>
+      <span style={{ fontSize: 12, color: c.ink3, fontVariantNumeric: 'tabular-nums' }}>{r.vat > 0 ? `מתוכם מע״מ ${ils(r.vat)}` : 'ללא מע״מ'}</span>
     </div>
+  ) : (
+    <span style={{ fontSize: 14, color: c.ink4 }}>אין סכום</span>
   )
 
   const scanCell = scan ? (
     <button
       onClick={() => onView(scan)}
       title="הצגת הסריקה"
-      style={{ display: 'flex', alignItems: 'center', gap: 8, height: 56, padding: 4, paddingInlineEnd: 12, background: c.surface, border: `1px solid ${c.line}`, borderRadius: 8, cursor: 'pointer', color: c.ink, fontSize: 14, minWidth: 0 }}
+      className="row-btn"
+      style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52, padding: '0 8px', background: 'transparent', border: 'none', borderRadius: 10, cursor: 'pointer', color: c.ink, minWidth: 0, font: 'inherit', textAlign: 'start' }}
     >
-      {scan.thumb ? <img src={scan.thumb} alt="" style={{ width: 36, height: 46, objectFit: 'cover', objectPosition: 'top', borderRadius: 4, border: `1px solid ${c.line}` }} /> : <Paperclip size={18} />}
-      <span>סריקה מצורפת</span>
+      {scan.thumb ? (
+        <img src={scan.thumb} alt="" style={{ width: 28, height: 36, objectFit: 'cover', objectPosition: 'top', borderRadius: 4, boxShadow: `0 0 0 1px ${c.line}` }} />
+      ) : (
+        <Paperclip size={18} />
+      )}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>סריקה מצורפת</span>
+        <span style={{ fontSize: 12, color: c.ink3 }}>הצגה או החלפה</span>
+      </span>
     </button>
   ) : (
-    <Button icon={<Paperclip size={18} />} onClick={onAttach} style={{ height: 56 }}>
+    <Button icon={<Paperclip size={16} />} onClick={onAttach} style={{ height: 36, padding: '0 12px', fontSize: 14 }}>
       צירוף סריקה
     </Button>
   )
 
-  const box = select && <Check4 checked={select.on} disabled={!select.can} label={select.can ? `הכללת ${p.name} בטבלה` : `${p.name}: ${has ? 'חסרה סריקה' : 'אין מפגשים החודש'}`} onChange={select.toggle} />
+  const box = select && <Check4 checked={select.on} disabled={!select.can} label={select.can ? `הכללת ${p.name} בטבלה` : `${p.name}: ${need}`} onChange={select.toggle} />
 
-  const cardStyle = {
+  const look: CSSProperties = {
     opacity: dim ? 0.45 : 1,
-    boxShadow: flash ? `0 0 0 2px ${c.ok}` : select?.on ? `0 0 0 2px ${c.primary}` : undefined,
     background: flash ? c.okBg : c.surface,
+    borderRadius: 12,
+    boxShadow: select?.on ? `0 0 0 2px ${c.primary}` : flash ? `0 0 0 2px ${c.ok}` : '0 0 0 1px rgba(16,24,40,0.05), 0 1px 2px rgba(16,24,40,0.04)',
     transition: `opacity 240ms ${EASE}, box-shadow 240ms ${EASE}, background 600ms ${EASE}`,
+    animation: `rise 320ms ${EASE}`,
   }
 
   if (wide)
     return (
-      <Card id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, alignItems: 'center', padding: '16px 24px', ...cardStyle }}>
+      <div id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 24, alignItems: 'center', padding: '12px 24px', minHeight: 80, ...look }}>
         {box}
         {who}
         <Stepper hideLabel label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
         <Stepper hideLabel label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
         {sums}
-        {scanCell}
-      </Card>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{scanCell}</div>
+      </div>
     )
 
   return (
-    <Card style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, ...cardStyle }}>
-      <div id={`row-${p.id}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+    <div id={`row-${p.id}`} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, ...look }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {box}
         <div style={{ flex: 1, minWidth: 0 }}>{who}</div>
       </div>
@@ -586,17 +664,41 @@ function Row({
         <Stepper label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
         <Stepper label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
       </div>
-      {sums}
-      {scanCell}
-    </Card>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        {sums}
+        {scanCell}
+      </div>
+    </div>
   )
 }
 
-function Num({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+/** קבוצת מטופלים על משטח משותף */
+function Group({ tone, title, count, sub, head, children }: { tone: 'ok' | 'warn'; title: string; count: number; sub: string; head: ReactNode; children: ReactNode }) {
+  const col = tone === 'ok' ? c.ok : c.warn
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      <span style={{ fontSize: 12, color: c.ink2 }}>{label}</span>
-      <span style={{ fontSize: strong ? 20 : 17, fontWeight: strong ? 700 : 500, fontVariantNumeric: 'tabular-nums', color: c.ink }}>{value}</span>
+    <section aria-label={title} style={{ background: tone === 'ok' ? c.okSurf : c.group, borderRadius: 20, padding: '16px 8px 8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px 12px', flexWrap: 'wrap' }}>
+        <span style={{ color: col, display: 'flex' }}>{tone === 'ok' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}</span>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: col }}>{title}</h3>
+        <span style={{ minWidth: 22, height: 22, padding: '0 6px', borderRadius: 11, background: c.surface, color: col, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+        <span style={{ fontSize: 13, color: c.ink3, marginInlineStart: 8 }}>{sub}</span>
+      </div>
+      {head}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{children}</div>
+    </section>
+  )
+}
+
+/** פס התקדמות: מקטע לכל מטופל, או פס רציף כשיש הרבה מטופלים */
+function Segments({ n, t }: { n: number; t: number }) {
+  const bar = (on: boolean, flex = 1) => ({ flex, height: 6, borderRadius: 3, background: on ? '#fff' : 'rgba(255,255,255,0.22)', transition: `background 320ms ${EASE}` })
+  return (
+    <div role="progressbar" aria-valuenow={n} aria-valuemin={0} aria-valuemax={t} aria-label="מטופלים מוכנים לדיווח" style={{ display: 'flex', gap: 4, marginTop: 24, maxWidth: 360 }}>
+      {t <= 12 ? Array.from({ length: t }, (_, i) => <span key={i} style={bar(i < n)} />) : (
+        <span style={{ ...bar(false), position: 'relative', overflow: 'hidden' }}>
+          <span style={{ position: 'absolute', insetBlock: 0, insetInlineStart: 0, width: `${(n / t) * 100}%`, background: '#fff', borderRadius: 3, transition: `width 480ms ${EASE}` }} />
+        </span>
+      )}
     </div>
   )
 }
@@ -609,71 +711,56 @@ function Welcome({ ctx, archived, onAdd, onImport }: { ctx: Ctx; archived: numbe
     ['מצרפים סריקות ומפיקים', 'הטבלה החודשית נבנית לבד, והקבצים מקבלים שמות אחידים.'],
   ]
   const more: { icon: ReactNode; title: string; sub: string; onClick: () => void }[] = [
-    { icon: <FileSpreadsheet size={20} />, title: 'ייבוא רשימת מטופלים מאקסל', sub: 'כל המטופלים נכנסים בבת אחת, עם תצוגה מקדימה לפני השמירה.', onClick: onImport },
-    { icon: <Percent size={20} />, title: 'הגדרת מע״מ ושם המטפל', sub: 'שיעור המע״מ, עוסק פטור, והשם שמופיע מעל הטבלה.', onClick: () => go('settings') },
+    { icon: <FileSpreadsheet size={18} />, title: 'ייבוא רשימת מטופלים מאקסל', sub: 'כל המטופלים נכנסים בבת אחת, עם תצוגה מקדימה לפני השמירה.', onClick: onImport },
+    { icon: <Percent size={18} />, title: 'הגדרת מע״מ ושם המטפל', sub: 'שיעור המע״מ, עוסק פטור, והשם שמופיע מעל הטבלה.', onClick: () => go('settings') },
   ]
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24, animation: `rise 480ms ${EASE}` }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>דיווח חודשי למשרד הביטחון, בלי טבלאות ביד</h1>
-        <p style={{ margin: 0, fontSize: 16, color: c.ink2, lineHeight: 1.6 }}>חישוב מע״מ וסה״כ לכל טופס, טבלה חודשית מוכנה, וקבצים מסודרים להעלאה.</p>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: `rise 480ms ${EASE}` }}>
       {archived > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 16px', background: c.warnBg, color: c.warn, borderRadius: 12, fontSize: 15 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 16px', paddingInlineStart: 24, background: c.warnSoft, color: c.warn, borderRadius: 16, fontSize: 15, flexWrap: 'wrap' }}>
           <span>{archived === 1 ? 'המטופל היחיד נמצא בארכיון.' : `כל ${archived} המטופלים נמצאים בארכיון.`} אפשר להחזיר אותם לרשימה בעמוד המטופלים.</span>
           <Button kind="ghost" onClick={() => go('patients')} style={{ color: c.warn, fontWeight: 600 }}>
             מעבר לעמוד המטופלים
           </Button>
         </div>
       )}
-      <Card style={{ padding: 8, background: c.sub, border: 'none' }}>
-        {steps.map(([t, d], i) => (
-          <div key={t} style={{ display: 'flex', gap: 16, padding: 16, background: c.surface, borderRadius: 8, marginTop: i ? 8 : 0 }}>
-            <span style={{ flex: '0 0 32px', height: 32, borderRadius: 999, background: c.primary, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>{i + 1}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontWeight: 600 }}>{t}</span>
-              <span style={{ fontSize: 15, color: c.ink2, lineHeight: 1.5 }}>{d}</span>
-            </div>
-          </div>
-        ))}
-      </Card>
-      <Button kind="primary" icon={<UserPlus size={18} />} onClick={onAdd} style={{ alignSelf: 'flex-start', height: 48, padding: '0 24px' }}>
-        הוספת מטופל ראשון
-      </Button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: c.ink2 }}>אפשר גם להתחיל מכאן</span>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
+      <Card style={{ padding: ctx.wide ? 40 : 24, borderRadius: 20, display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: ctx.wide ? 28 : 22, fontWeight: 600, letterSpacing: -0.5 }}>דיווח חודשי למשרד הביטחון, בלי טבלאות ביד</h2>
+          <p style={{ margin: 0, fontSize: 16, color: c.ink2, lineHeight: 1.6 }}>חישוב מע״מ וסה״כ לכל טופס, טבלה חודשית מוכנה, וקבצים מסודרים להעלאה.</p>
+        </div>
+        <ol style={{ listStyle: 'none', margin: 0, padding: 8, background: c.sub, borderRadius: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
+          {steps.map(([t, d], i) => (
+            <li key={t} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 20, background: c.surface, borderRadius: 12 }}>
+              <span style={{ width: 28, height: 28, borderRadius: 999, background: c.primary, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14 }}>{i + 1}</span>
+              <span style={{ fontWeight: 600, fontSize: 16 }}>{t}</span>
+              <span style={{ fontSize: 14, color: c.ink2, lineHeight: 1.6 }}>{d}</span>
+            </li>
+          ))}
+        </ol>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Button kind="primary" icon={<UserPlus size={18} />} onClick={onAdd} style={{ height: 48, padding: '0 24px' }} title="קיצור מקלדת: N">
+            הוספת מטופל ראשון
+          </Button>
           {more.map((m) => (
-            <button
-              key={m.title}
-              onClick={m.onClick}
-              style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 16, background: c.surface, border: `1px solid ${c.line}`, borderRadius: 12, textAlign: 'start', cursor: 'pointer', color: c.ink, font: 'inherit' }}
-            >
-              <span style={{ flex: '0 0 40px', height: 40, borderRadius: 8, background: c.sub, color: c.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{m.icon}</span>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontWeight: 600, fontSize: 15 }}>{m.title}</span>
-                <span style={{ fontSize: 14, color: c.ink2, lineHeight: 1.5 }}>{m.sub}</span>
-              </span>
-            </button>
+            <Button key={m.title} icon={m.icon} onClick={m.onClick} style={{ height: 48 }} title={m.sub}>
+              {m.title}
+            </Button>
           ))}
         </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', color: c.ink2, fontSize: 14, lineHeight: 1.5 }}>
-        <ShieldCheck size={18} style={{ flex: '0 0 18px', marginTop: 2, color: c.ok }} />
-        <span>כל המידע נשמר רק בדפדפן הזה, במכשיר הזה. שום דבר לא נשלח לשרת.</span>
-      </div>
+      </Card>
     </div>
   )
 }
 
-/** שיעור המע״מ משתנה מעת לעת, ולכן אפשר לעדכן אותו ישירות מכאן */
+/** שיעור המע״מ משתנה מעת לעת, ולכן אפשר לעדכן אותו ישירות מכאן (בתוך כרטיס הסיכום הכהה) */
 function VatInline({ ctx }: { ctx: Ctx }) {
   const { data, setData, toast, month } = ctx
   const v = vatOf(data, month)
-  const s = { vatRate: v.rate, vatExempt: v.exempt }
   const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(String(s.vatRate))
-  if (s.vatExempt) return <span>עוסק פטור, בלי מע״מ</span>
+  const [val, setVal] = useState(String(v.rate))
+  const big: CSSProperties = { fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }
+  if (v.exempt) return <span style={{ ...big, fontSize: 18 }}>עוסק פטור</span>
   const save = () => {
     const n = parseFloat(val)
     if (!Number.isFinite(n) || n < 0 || n > 100) return toast('שיעור מע״מ צריך להיות מספר בין 0 ל-100')
@@ -681,53 +768,39 @@ function VatInline({ ctx }: { ctx: Ctx }) {
     setEditing(false)
     toast(`המע״מ עודכן ל-${n}% מ${monthLabel(month)} והלאה. החודשים הקודמים לא השתנו.`)
   }
+  const chip: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, padding: '0 10px', border: 'none', borderRadius: 8, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', font: 'inherit' }
   if (!editing)
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        מע״מ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{s.vatRate}%</b>
-        <button
-          onClick={() => (setVal(String(s.vatRate)), setEditing(true))}
-          aria-label="עריכת שיעור המע״מ"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, padding: '0 8px', border: 'none', borderRadius: 8, background: 'transparent', color: c.primary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-        >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+        <span style={big}>{v.rate}%</span>
+        <button onClick={() => (setVal(String(v.rate)), setEditing(true))} aria-label="שינוי שיעור המע״מ" style={chip}>
           <Pencil size={14} />
-          עריכה
+          שינוי המע״מ
         </button>
       </span>
     )
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-      <label htmlFor="vat-inline">מע״מ</label>
       <span style={{ position: 'relative', display: 'inline-flex' }}>
         <input
-          id="vat-inline"
+          aria-label="שיעור המע״מ באחוזים"
           autoFocus
           value={val}
-          onChange={(e) => setVal(e.target.value)}
+          onChange={(e) => setVal(e.target.value.replace(/[^\d.]/g, ''))}
           onKeyDown={(e) => (e.key === 'Escape' ? setEditing(false) : e.key === 'Enter' && save())}
           inputMode="decimal"
           dir="ltr"
-          style={{ width: 72, height: 32, borderRadius: 8, border: `1px solid ${c.primary}`, background: c.surface, padding: '0 24px 0 8px', fontSize: 15, color: c.ink, textAlign: 'right' }}
+          style={{ width: 72, height: 32, borderRadius: 8, border: 'none', background: '#fff', padding: '0 24px 0 8px', fontSize: 15, color: c.ink, textAlign: 'right' }}
         />
-        <span style={{ position: 'absolute', right: 8, top: 0, bottom: 0, display: 'flex', alignItems: 'center', color: c.ink2, fontSize: 14 }}>%</span>
+        <span style={{ position: 'absolute', right: 8, top: 0, bottom: 0, display: 'flex', alignItems: 'center', color: c.ink3, fontSize: 14 }}>%</span>
       </span>
-      <Button kind="primary" icon={<Check size={16} />} onClick={save} style={{ height: 32, padding: '0 12px', fontSize: 14 }}>
+      <button onClick={save} style={{ ...chip, background: '#fff', color: c.primary, fontWeight: 600 }}>
+        <Check size={14} />
         שמירה
-      </Button>
-      <Button kind="ghost" onClick={() => setEditing(false)} style={{ height: 32, padding: '0 8px', fontSize: 14 }}>
+      </button>
+      <button onClick={() => setEditing(false)} style={{ ...chip, background: 'transparent' }}>
         ביטול
-      </Button>
+      </button>
     </div>
-  )
-}
-
-/** טבעת התקדמות בגודל קבוע, כדי שהפס העליון לא ישנה רוחב */
-function Ring({ pct }: { pct: number }) {
-  const R = 9, L = 2 * Math.PI * R
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" role="progressbar" aria-valuenow={Math.round(pct * 100)} aria-valuemin={0} aria-valuemax={100} style={{ flex: '0 0 24px', transform: 'rotate(-90deg)' }}>
-      <circle cx={12} cy={12} r={R} fill="none" stroke={c.sub} strokeWidth={4} />
-      <circle cx={12} cy={12} r={R} fill="none" stroke={c.ok} strokeWidth={4} strokeLinecap="round" strokeDasharray={L} strokeDashoffset={L * (1 - pct)} style={{ transition: `stroke-dashoffset 480ms ${EASE}` }} />
-    </svg>
   )
 }

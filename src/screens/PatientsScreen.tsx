@@ -1,12 +1,14 @@
 import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
 import { useState } from 'react'
-import { FileSpreadsheet, UserPlus } from 'lucide-react'
+import { ChevronLeft, FileSpreadsheet, UserPlus } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card } from '../ui'
 import { ils, updatePatient, type Patient } from '../model'
 import PatientForm from './PatientForm'
-import { PageBar } from './parts'
+import { Avatar, PageBar } from './parts'
+
+const COLS = 'minmax(240px, 2fr) 1fr 1fr 1fr 24px'
 
 export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, toast, wide, month } = ctx
@@ -30,11 +32,11 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: wide ? 24 : 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <PageBar
         ctx={ctx}
         title="מטופלים"
-        middle={<span>הפרטים מוזנים פעם אחת ומשמשים לכל חודש.</span>}
+        sub="הפרטים מוזנים פעם אחת ומשמשים לכל חודש."
         actions={
           <>
           <Button icon={<FileSpreadsheet size={18} />} onClick={() => setImporting(true)}>
@@ -48,7 +50,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
       />
 
       {archived.length > 0 && (
-        <div role="tablist" style={{ display: 'inline-flex', alignSelf: 'flex-start', background: c.sub, borderRadius: 8, padding: 4, gap: 4 }}>
+        <div role="tablist" style={{ display: 'inline-flex', alignSelf: 'flex-start', background: c.group, borderRadius: 10, padding: 4, gap: 4 }}>
           {[
             [false, `פעילים (${active.length})`],
             [true, `ארכיון (${archived.length})`],
@@ -58,7 +60,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
               role="tab"
               aria-selected={showArchived === v}
               onClick={() => setShowArchived(v as boolean)}
-              style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 6, background: showArchived === v ? c.surface : 'transparent', color: c.ink, fontWeight: showArchived === v ? 600 : 400, fontSize: 14, cursor: 'pointer', boxShadow: showArchived === v ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}
+              style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 8, background: showArchived === v ? c.surface : 'transparent', color: c.ink, fontWeight: showArchived === v ? 600 : 400, fontSize: 14, cursor: 'pointer', boxShadow: showArchived === v ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}
             >
               {l as string}
             </button>
@@ -71,11 +73,12 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
       ) : (
         <Card style={{ overflow: 'hidden' }}>
           {wide && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, padding: '12px 24px', background: c.sub, fontSize: 13, color: c.ink2, fontWeight: 500 }}>
-              <span>שם</span>
+            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 24, padding: '14px 24px', background: c.sub, fontSize: 12, color: c.ink3, fontWeight: 500 }}>
+              <span>מטופל</span>
               <span>מספר תיק</span>
               <span>מספר הפנייה</span>
               <span>סכום למפגש</span>
+              <span />
             </div>
           )}
           {list.map((p, i) => (
@@ -93,15 +96,18 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
                 textAlign: 'start',
                 cursor: 'pointer',
                 display: 'grid',
-                gridTemplateColumns: wide ? '2fr 1fr 1fr 1fr' : '1fr',
-                gap: wide ? 16 : 8,
+                gridTemplateColumns: wide ? COLS : '1fr',
+                gap: wide ? 24 : 8,
                 alignItems: 'center',
-                padding: wide ? '16px 24px' : 16,
+                padding: wide ? '12px 24px' : 16,
+                minHeight: wide ? 64 : undefined,
                 borderTop: i ? `1px solid ${c.line}` : 'none',
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontWeight: 600, fontSize: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+                <Avatar name={p.name} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <span style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   {p.name} {p.archived && <Badge tone="muted">ארכיון</Badge>}
                 </span>
                 {!wide && (
@@ -109,12 +115,14 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
                     תיק {p.fileNo} · הפנייה {p.referralNo} · {ils(p.rate)} למפגש
                   </span>
                 )}
+                </div>
               </div>
               {wide && (
                 <>
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.fileNo}</span>
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.referralNo}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{ils(p.rate)}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{ils(p.rate)}</span>
+                  <ChevronLeft size={18} style={{ color: c.ink4, justifySelf: 'end' }} />
                 </>
               )}
             </button>

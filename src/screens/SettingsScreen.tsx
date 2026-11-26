@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
-import { Button, c, Card, Field } from '../ui'
+import { Button, c, Card, EASE, Field } from '../ui'
 import { defaultSettings, monthLabel, setVatFrom, vatOf, wipeAll, type Data, type Settings } from '../model'
 import { backupFile, readBackup } from '../backup'
 import { downloadFiles } from '../files'
@@ -50,10 +50,11 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720, paddingTop: ctx.wide ? 24 : 0 }}>
-      <PageBar ctx={ctx} title="הגדרות" middle={<span>שינויים נשמרים אוטומטית.</span>} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <PageBar ctx={ctx} title="הגדרות" sub="שינויים נשמרים אוטומטית." />
+      <span aria-hidden style={{ marginTop: -8 }} />
 
-      <Section title="חישוב">
+      <Section wide={ctx.wide} title="חישוב" desc="מע״מ והסכום שמופיע בטבלה שנשלחת למשרד.">
         <Field label="שיעור מע״מ" value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={`חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
         {vatBad && (
           <p role="alert" style={{ margin: '-8px 0 0', fontSize: 14, color: c.danger }}>
@@ -63,7 +64,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         <Toggle label="עוסק פטור (בלי מע״מ)" checked={mv.exempt} onChange={(v) => setData((d) => setVatFrom(d, month, { rate: vatOf(d, month).rate, exempt: v }))} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 500 }}>הסכום שמופיע בטבלה החודשית</span>
-          <div role="radiogroup" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div role="radiogroup" aria-label="הסכום שמופיע בטבלה החודשית" style={{ display: 'inline-flex', alignSelf: 'flex-start', background: c.group, borderRadius: 10, padding: 4, gap: 4 }}>
             {(
               [
                 ['total', 'סה״כ כולל מע״מ'],
@@ -75,7 +76,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
                 role="radio"
                 aria-checked={s.tableAmount === v}
                 onClick={() => set({ tableAmount: v })}
-                style={{ height: 40, padding: '0 16px', borderRadius: 8, border: `1px solid ${s.tableAmount === v ? c.primary : c.line}`, background: s.tableAmount === v ? '#E8EEF6' : c.surface, color: c.ink, fontWeight: s.tableAmount === v ? 600 : 400, fontSize: 15, cursor: 'pointer' }}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: s.tableAmount === v ? c.surface : 'transparent', boxShadow: s.tableAmount === v ? '0 1px 2px rgba(16,24,40,0.10)' : 'none', color: s.tableAmount === v ? c.ink : c.ink2, fontWeight: s.tableAmount === v ? 600 : 500, fontSize: 14, cursor: 'pointer', transition: `background 200ms ${EASE}` }}
               >
                 {l}
               </button>
@@ -84,13 +85,13 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         </div>
       </Section>
 
-      <Section title="פרטים בראש הטבלה">
+      <Section wide={ctx.wide} title="פרטים בראש הטבלה" desc="מה שמופיע מעל הטבלה החודשית.">
         <Field label="שם המטפל/ת" value={s.therapistName} onChange={(v) => set({ therapistName: v })} hint="מופיע מעל הטבלה החודשית. לא חובה." />
       </Section>
 
-      <Section title="גיבוי">
+      <Section wide={ctx.wide} title="גיבוי" desc="קובץ עם המטופלים והסכומים, למעבר מחשב או לשחזור.">
         <p style={{ margin: 0, color: c.ink2, fontSize: 15, lineHeight: 1.6 }}>
-          המידע נשמר רק בדפדפן הזה. גיבוי שומר את המטופלים והסכומים לקובץ, כדי לעבור למכשיר אחר או לשחזר. הסריקות לא נכללות בגיבוי.
+          המידע נשמר רק במחשב הזה. גיבוי שומר את המטופלים והסכומים לקובץ, כדי לעבור למחשב אחר או לשחזר. הסריקות לא נכללות בגיבוי.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button icon={<DatabaseBackup size={18} />} onClick={backup}>
@@ -101,7 +102,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
           </Button>
         </div>
         {pending && (
-          <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.warnBg, borderRadius: 8 }}>
+          <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.warnSoft, borderRadius: 12 }}>
             <span style={{ color: c.warn, fontSize: 15, lineHeight: 1.6 }}>
               השחזור יחליף את {data.patients.length} המטופלים והסכומים שיש עכשיו במכשיר ב-{pending.patients.length} המטופלים מהקובץ. הסריקות שצורפו יוסרו, כי הן לא נשמרות בגיבוי.
             </span>
@@ -118,13 +119,13 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => (restore(e.target.files?.[0]), (e.target.value = ''))} />
       </Section>
 
-      <Section title="מחיקה">
+      <Section wide={ctx.wide} title="מחיקה" desc="מחיקה של כל המידע מהמחשב הזה.">
         {!confirmWipe ? (
           <Button kind="danger" icon={<Trash2 size={18} />} onClick={() => setConfirmWipe(true)} style={{ alignSelf: 'flex-start' }}>
             מחיקת כל המידע מהמכשיר
           </Button>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.dangerBg, borderRadius: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.dangerBg, borderRadius: 12 }}>
             <span style={{ color: c.danger, fontSize: 15 }}>כל המטופלים, הסכומים והסריקות יימחקו מהמכשיר הזה, ואי אפשר לשחזר אותם בלי קובץ גיבוי.</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <Button
@@ -151,27 +152,30 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, desc, wide, children }: { title: string; desc: string; wide: boolean; children: React.ReactNode }) {
   return (
-    <Card style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{title}</h2>
-      {children}
+    <Card style={{ padding: wide ? 32 : 24, display: 'grid', gridTemplateColumns: wide ? '280px minmax(0, 560px)' : '1fr', gap: wide ? 48 : 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{title}</h2>
+        <p style={{ margin: 0, fontSize: 14, color: c.ink3, lineHeight: 1.5 }}>{desc}</p>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>{children}</div>
     </Card>
   )
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, cursor: 'pointer' }}>
-      <span style={{ fontSize: 15 }}>{label}</span>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', alignSelf: 'flex-start' }}>
       <button
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        style={{ width: 48, height: 28, borderRadius: 999, border: 'none', background: checked ? c.primary : '#C9CED6', position: 'relative', cursor: 'pointer', transition: 'background 200ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+        style={{ width: 48, height: 28, borderRadius: 999, border: 'none', background: checked ? c.primary : '#CBD3DF', position: 'relative', cursor: 'pointer', transition: 'background 200ms cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
-        <span style={{ position: 'absolute', top: 4, insetInlineStart: checked ? 24 : 4, width: 20, height: 20, borderRadius: 999, background: '#fff', transition: 'inset-inline-start 200ms cubic-bezier(0.16, 1, 0.3, 1)' }} />
+        <span style={{ position: 'absolute', top: 4, insetInlineStart: checked ? 24 : 4, width: 20, height: 20, borderRadius: 999, background: '#fff', boxShadow: '0 1px 2px rgba(16,24,40,0.2)', transition: 'inset-inline-start 200ms cubic-bezier(0.16, 1, 0.3, 1)' }} />
       </button>
+      <span style={{ fontSize: 15 }}>{label}</span>
     </label>
   )
 }

@@ -103,7 +103,7 @@ function Batch({ ctx, list, index, count, saved, onSaved }: { ctx: Ctx; list: Pa
 
       {/* התצוגה הזו היא גם מה שנשמר כ-PDF */}
       <FitBox>
-        <div ref={ref} dir="rtl" style={{ width: 720, margin: '0 auto', background: '#fff', padding: 32, fontFamily: "'Rubik Variable', Arial, sans-serif", color: '#111' }}>
+        <div ref={ref} dir="rtl" style={{ width: 720, margin: '0 auto', background: '#fff', padding: 32, fontFamily: "'IBM Plex Sans Hebrew', Arial, sans-serif", color: '#111' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 20, fontWeight: 700 }}>דיווח טיפולים · {monthLabel(month)}</div>
