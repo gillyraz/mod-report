@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { AlertCircle, Check, Clock, LockOpen, Eye, EyeOff, FileText, FolderOpen, KeyRound, Lock, ShieldCheck, Sheet, Users } from 'lucide-react'
+import { AlertCircle, Check, Clock, Copy, ExternalLink, ScanLine, LockOpen, Eye, EyeOff, FileText, FolderOpen, KeyRound, Lock, ShieldCheck, Sheet, Users } from 'lucide-react'
 import logo from '../../public/favicon.svg'
 import { Button, c, EASE } from '../ui'
 import * as vault from '../vault'
+import { PROTO } from '../proto'
 import type { Data, Scan } from '../model'
 
 type Opened = { data: Data; scans: Scan[] }
@@ -11,7 +12,9 @@ type Step = { s: 'folder' } | { s: 'password'; label: string } | { s: 'unlock'; 
 /** המסכים שלפני הכלי: בחירת תיקייה, יצירת סיסמה ופתיחה */
 export default function Gate({ boot, wide, onOpen }: { boot: vault.Boot; wide: boolean; onOpen: (o: Opened) => void }) {
   const folders = vault.canPickFolder()
-  const [step, setStep] = useState<Step>(() => (boot.state === 'locked' ? { s: 'unlock', label: boot.label, needsPermission: boot.needsPermission } : folders ? { s: 'folder' } : (vault.useBrowserStore(), { s: 'password', label: 'הדפדפן במכשיר הזה' })))
+  // בטלפון אין תיקייה, ומידע שיוזן בו לא יגיע לטבלה במחשב. לכן בטלפון מוצג רק הסבר
+  const phone = PROTO ? !wide : !folders
+  const [step, setStep] = useState<Step>(() => (boot.state === 'locked' ? { s: 'unlock', label: boot.label, needsPermission: boot.needsPermission } : { s: 'folder' }))
   const [note, setNote] = useState<string>()
 
   const pick = async () => {
@@ -39,9 +42,10 @@ export default function Gate({ boot, wide, onOpen }: { boot: vault.Boot; wide: b
         </div>
       </header>
       <main style={{ flex: 1, padding: wide ? '56px 32px' : '24px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-        {step.s === 'folder' && <FolderStep wide={wide} onPick={pick} note={note} />}
-        {step.s === 'password' && <PasswordStep wide={wide} label={step.label} folders={folders} onBack={() => (setNote(undefined), setStep({ s: 'folder' }))} onOpen={onOpen} />}
-        {step.s === 'unlock' && <UnlockStep wide={wide} label={step.label} note={note} onOpen={onOpen} onOther={folders ? pick : undefined} />}
+        {phone && <PhoneStep />}
+        {!phone && step.s === 'folder' && <FolderStep wide={wide} onPick={pick} note={note} />}
+        {!phone && step.s === 'password' && <PasswordStep wide={wide} label={step.label} folders={folders} onBack={() => (setNote(undefined), setStep({ s: 'folder' }))} onOpen={onOpen} />}
+        {!phone && step.s === 'unlock' && <UnlockStep wide={wide} label={step.label} note={note} onOpen={onOpen} onOther={folders ? pick : undefined} />}
       </main>
     </div>
   )
@@ -257,6 +261,86 @@ function UnlockStep({ wide, label, note, onOpen, onOther }: { wide: boolean; lab
           </Button>
         )}
       </form>
+    </Card>
+  )
+}
+
+function PhoneArt() {
+  return (
+    <div aria-hidden style={{ height: 184, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, background: 'linear-gradient(120deg, #EEF3FF, #E6EDFF 50%, #EFEAFF)' }}>
+      <div style={{ width: 72, height: 128, borderRadius: 16, background: '#fff', boxShadow: '0 0 0 4px #5577F0, 0 16px 28px -12px rgba(69,102,232,0.6)', display: 'grid', placeItems: 'center' }}>
+        <div style={{ width: 44, height: 60, borderRadius: 6, background: c.primarySoft, display: 'grid', placeItems: 'center', color: c.primary }}>
+          <ScanLine size={22} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[0, 1, 2].map((i) => (
+          <span key={i} style={{ width: 6, height: 6, borderRadius: 3, background: '#7C98F7', opacity: 0.4 + i * 0.3 }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ width: 128, height: 84, borderRadius: '12px 12px 4px 4px', background: 'linear-gradient(180deg,#6A88F5,#4566E8)', padding: 6, boxShadow: '0 16px 28px -12px rgba(69,102,232,0.6)' }}>
+          <div style={{ height: '100%', borderRadius: 6, background: '#fff', display: 'grid', placeItems: 'center', color: c.primary }}>
+            <Sheet size={24} />
+          </div>
+        </div>
+        <div style={{ width: 152, height: 8, borderRadius: '0 0 8px 8px', background: '#3E5BD6' }} />
+      </div>
+    </div>
+  )
+}
+
+/** בטלפון: רק סורקים ב-Drive. הכלי עצמו עובד במחשב */
+function PhoneStep() {
+  const [copied, setCopied] = useState<boolean | null>(null)
+  const url = location.origin + location.pathname
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+    } catch {
+      // אין גישה ללוח: מציגים את הקישור כדי להעתיק אותו ידנית
+      setCopied(false)
+    }
+  }
+  const steps: [string, string][] = [
+    ['סורקים כל טופס חתום', 'באפליקציית Google Drive לוחצים על + ואז על ״סריקה״. הסריקה נשמרת ב-Drive.'],
+    ['פותחים את הכלי במחשב, בכרום', 'שם נמצאים המטופלים, הסכומים והטבלה, ושם הם נשמרים.'],
+    ['מצרפים את הסריקות', 'בעמוד ״החודש״ לוחצים ״ייבוא סריקות״ ובוחרים אותן מ-Drive.'],
+  ]
+  return (
+    <Card art={<PhoneArt />}>
+      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h1 style={h1}>הדיווח נעשה במחשב</h1>
+        <p style={lead}>בטלפון רק סורקים את הטפסים החתומים. כך כל המידע נשאר במקום אחד.</p>
+        <ol style={{ listStyle: 'none', margin: '8px 0 0', padding: 8, borderRadius: 16, background: c.sub, display: 'flex', flexDirection: 'column' }}>
+          {steps.map(([t, d], i) => (
+            <li key={t} style={{ display: 'flex', gap: 12, padding: 8 }}>
+              <span aria-hidden style={{ flex: 'none', width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 600, background: c.primary, color: '#fff', marginTop: 1 }}>{i + 1}</span>
+              <span>
+                <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>{t}</span>
+                <span style={{ display: 'block', color: c.ink3, fontSize: 13, lineHeight: 1.6, marginTop: 2 }}>{d}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+          <Button kind="primary" icon={<ExternalLink size={18} />} onClick={() => window.open('https://drive.google.com', '_blank', 'noopener')} style={{ width: '100%', height: 48, fontSize: 15 }}>
+            פתיחת Google Drive לסריקה
+          </Button>
+          <Button icon={copied ? <Check size={18} /> : <Copy size={18} />} onClick={copy} style={{ width: '100%', height: 48, fontSize: 15 }}>
+            {copied ? 'הקישור הועתק' : 'העתקת הקישור לפתיחה במחשב'}
+          </Button>
+          <span role="status" style={{ fontSize: 13, color: c.ink3, textAlign: 'center', minHeight: 20 }}>
+            {copied === true && 'שולחים אותו לעצמכם ופותחים אותו במחשב, בכרום.'}
+            {copied === false && (
+              <>
+                לא הצלחנו להעתיק. זה הקישור: <bdi dir="ltr" style={{ userSelect: 'all', color: c.ink }}>{url}</bdi>
+              </>
+            )}
+          </span>
+        </div>
+      </div>
     </Card>
   )
 }
