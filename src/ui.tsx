@@ -87,7 +87,7 @@ export function Button({
   }
   const kinds: Record<BtnKind, CSSProperties> = {
     primary: { background: hover && !disabled ? c.primaryHover : 'linear-gradient(180deg, #5577F0, #4566E8)', color: '#fff', boxShadow: disabled ? 'none' : '0 1px 2px rgba(69,102,232,0.3), 0 4px 12px -4px rgba(69,102,232,0.45), inset 0 1px 0 rgba(255,255,255,0.18)' },
-    secondary: { background: hover && !disabled ? c.sub : c.surface, color: c.ink, borderColor: '#E1E7F2', boxShadow: '0 1px 2px rgba(16,24,40,0.04)' },
+    secondary: { background: hover && !disabled ? c.sub : c.surface, color: c.primary, borderColor: '#E1E7F2', boxShadow: '0 1px 2px rgba(16,24,40,0.04)' },
     ghost: { background: hover && !disabled ? c.sub : 'transparent', color: c.ink2 },
     danger: { background: hover && !disabled ? c.dangerBg : 'transparent', color: c.danger },
   }
@@ -118,6 +118,7 @@ export function Field({
   autoFocus,
   suffix,
   dirLtr,
+  disabled,
 }: {
   label: string
   hint?: string
@@ -128,6 +129,7 @@ export function Field({
   autoFocus?: boolean
   suffix?: string
   dirLtr?: boolean
+  disabled?: boolean
 }) {
   const [focus, setFocus] = useState(false)
   return (
@@ -137,6 +139,7 @@ export function Field({
         <input
           value={value}
           type={type}
+          disabled={disabled}
           inputMode={inputMode}
           autoFocus={autoFocus}
           onChange={(e) => onChange(e.target.value)}
@@ -155,7 +158,9 @@ export function Field({
             background: focus ? c.surface : c.field,
             transition: `box-shadow 200ms ${EASE}, background 200ms ${EASE}`,
             fontSize: 16,
-            color: c.ink,
+            color: disabled ? c.ink3 : c.ink,
+            cursor: disabled ? 'not-allowed' : undefined,
+            opacity: disabled ? 0.6 : 1,
             textAlign: dirLtr ? 'right' : undefined,
           }}
         />

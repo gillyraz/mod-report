@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { DatabaseBackup, FolderOpen, KeyRound, Lock, Trash2, Upload } from 'lucide-react'
+import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, EASE, Field, lift } from '../ui'
 import * as vault from '../vault'
@@ -94,20 +94,20 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
       <span aria-hidden style={{ height: 24 }} />
 
       <Section wide={ctx.wide} flush title="שמירה ואבטחה" desc="איפה המידע נשמר ומי יכול לפתוח אותו.">
-        <Row icon={<FolderOpen size={18} />} title={vault.isFolder() ? `תיקייה ״${folder}״` : folder} desc={vault.isFolder() ? 'כאן נשמרים המטופלים, הסריקות והטבלאות.' : 'המידע נשמר מוצפן בדפדפן, במכשיר הזה בלבד.'}>
+        <Row title={vault.isFolder() ? `תיקייה ״${folder}״` : folder} desc={vault.isFolder() ? 'כאן נשמרים המטופלים, הסריקות והטבלאות.' : 'המידע נשמר מוצפן בדפדפן, במכשיר הזה בלבד.'}>
           {vault.isFolder() && vault.canPickFolder() && <Button onClick={move}>העברה לתיקייה אחרת</Button>}
         </Row>
         <Divider />
         <ChangePassword toast={toast} />
         <Divider />
-        <Row icon={<Lock size={18} />} title="נעילה אוטומטית" desc="כשאין שימוש הכלי ננעל, והמידע נשאר מוצפן.">
+        <Row title="נעילה אוטומטית" desc="כשאין שימוש הכלי ננעל, והמידע נשאר מוצפן.">
           <Segmented label="נעילה אוטומטית אחרי" value={s.lockMinutes} onChange={(v) => set({ lockMinutes: v })} options={[5, 15, 30, 60].map((m) => [m, `${m} דק׳`] as const)} />
         </Row>
       </Section>
 
       <Section wide={ctx.wide} title="חישוב" desc="מע״מ והסכום שמופיע בטבלה שנשלחת למשרד.">
         <div style={{ maxWidth: 480 }}>
-          <Field label="שיעור מע״מ" value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={`חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
+          <Field label="שיעור מע״מ" disabled={mv.exempt} value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={mv.exempt ? 'עוסק פטור לא גובה מע״מ, ולכן השיעור לא נכנס לחישוב.' : `חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
         </div>
         {vatBad && (
           <p role="alert" style={{ margin: '-8px 0 0', fontSize: 14, color: c.danger }}>
@@ -117,7 +117,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         <Toggle label="עוסק פטור (בלי מע״מ)" checked={mv.exempt} onChange={(v) => setData((d) => setVatFrom(d, month, { rate: vatOf(d, month).rate, exempt: v }))} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: c.ink2 }}>הסכום שמופיע בטבלה החודשית</span>
-          <Segmented label="הסכום שמופיע בטבלה החודשית" value={s.tableAmount} onChange={(v) => set({ tableAmount: v })} options={[['total', 'סה״כ כולל מע״מ'], ['beforeVat', 'לפני מע״מ']] as const} />
+          <Segmented label="הסכום שמופיע בטבלה החודשית" disabled={mv.exempt} value={s.tableAmount} onChange={(v) => set({ tableAmount: v })} options={[['total', 'סה״כ כולל מע״מ'], ['beforeVat', 'לפני מע״מ']] as const} />
         </div>
       </Section>
 
@@ -234,10 +234,9 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   )
 }
 
-function Row({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children?: React.ReactNode }) {
+function Row({ title, desc, children }: { title: string; desc: string; children?: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: 16 }}>
-      <span style={{ width: 40, height: 40, borderRadius: 14, background: c.primarySoft, color: c.primary, display: 'grid', placeItems: 'center', flex: 'none' }}>{icon}</span>
       <div style={{ flex: '1 1 0', minWidth: 160 }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>{title}</div>
         <div style={{ color: c.ink3, fontSize: 13, marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
@@ -268,11 +267,11 @@ function ChangePassword({ toast }: { toast: (t: string) => void }) {
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <Row icon={<KeyRound size={18} />} title="סיסמה" desc="המידע מוצפן בסיסמה. אין דרך לשחזר סיסמה שנשכחה.">
+      <Row title="סיסמה" desc="המידע מוצפן בסיסמה. אין דרך לשחזר סיסמה שנשכחה.">
         {!open && <Button onClick={() => setOpen(true)}>שינוי סיסמה</Button>}
       </Row>
       {open && (
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px 20px', paddingInlineStart: 72, maxWidth: 72 + 480 }}>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px 20px', maxWidth: 32 + 480 }}>
           <Field label="הסיסמה הנוכחית" type="password" value={cur} onChange={(v) => (setCur(v), setErr(undefined))} autoFocus />
           <Field label="סיסמה חדשה" type="password" value={next} onChange={(v) => (setNext(v), setErr(undefined))} hint="לפחות 8 תווים" />
           <Field label="הקלדה חוזרת של הסיסמה החדשה" type="password" value={next2} onChange={(v) => (setNext2(v), setErr(undefined))} />
@@ -288,13 +287,13 @@ function ChangePassword({ toast }: { toast: (t: string) => void }) {
 }
 
 /** בחירה אחת מכמה אפשרויות גלויות. אותו פקד לכל בחירה כזו בהגדרות */
-function Segmented<T extends string | number>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[] }) {
+function Segmented<T extends string | number>({ label, value, onChange, options, disabled }: { label: string; disabled?: boolean; value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[] }) {
   return (
-    <div role="radiogroup" aria-label={label} style={{ display: 'inline-flex', alignSelf: 'flex-start', background: c.sub, borderRadius: 12, padding: 4, gap: 4 }}>
+    <div role="radiogroup" aria-label={label} aria-disabled={disabled} style={{ opacity: disabled ? 0.5 : 1, display: 'inline-flex', alignSelf: 'flex-start', background: c.sub, borderRadius: 12, padding: 4, gap: 4 }}>
       {options.map(([v, l]) => {
         const on = value === v
         return (
-          <button key={String(v)} role="radio" aria-checked={on} onClick={() => onChange(v)} style={{ height: 32, padding: '0 12px', borderRadius: 9, border: 'none', background: on ? c.surface : 'transparent', boxShadow: on ? '0 1px 2px rgba(16,24,40,0.10)' : 'none', color: on ? c.ink : c.ink2, fontWeight: on ? 600 : 500, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', transition: `background 200ms ${EASE}` }}>
+          <button key={String(v)} role="radio" aria-checked={on} disabled={disabled} onClick={() => onChange(v)} style={{ height: 32, padding: '0 12px', borderRadius: 9, border: 'none', background: on ? c.primary : 'transparent', boxShadow: on ? '0 1px 2px rgba(69,102,232,0.3)' : 'none', color: on ? '#fff' : c.ink2, fontWeight: on ? 600 : 500, fontSize: 14, cursor: disabled ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', transition: `background 200ms ${EASE}` }}>
             {l}
           </button>
         )

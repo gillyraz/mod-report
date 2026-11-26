@@ -171,7 +171,7 @@ export default function App() {
               <ShieldCheck size={15} style={{ color: c.ok }} />
               המידע נשמר רק במחשב הזה
             </span>
-            <button onClick={lock} title="הכלי ננעל, והמידע נשאר מוצפן בתיקייה" style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 14px', borderRadius: 12, border: '1px solid #E1E7F2', background: c.surface, color: c.ink, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+            <button onClick={lock} title="הכלי ננעל, והמידע נשאר מוצפן בתיקייה" style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 14px', borderRadius: 12, border: '1px solid #E1E7F2', background: c.surface, color: c.primary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
               <Lock size={16} />
               נעילה
             </button>
