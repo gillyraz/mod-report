@@ -15,6 +15,16 @@ export default defineConfig({
       name: 'proto-html',
       transformIndexHtml: (html: string) => html.replace(', viewport-fit=cover', '').replace(/<link rel="icon"[^>]*>/, ''),
     },
+    // מדיניות אבטחה: הכלי לא יכול לטעון קוד או לשלוח מידע לשום כתובת חוץ מהאתר עצמו
+    !proto && {
+      name: 'csp',
+      apply: 'build' as const,
+      transformIndexHtml: (html: string) =>
+        html.replace(
+          '<meta charset="UTF-8" />',
+          `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />\n    <meta name="referrer" content="no-referrer" />`,
+        ),
+    },
     !proto && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],

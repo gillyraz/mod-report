@@ -33,6 +33,7 @@ export type Settings = {
   vatExempt: boolean
   tableAmount: 'total' | 'beforeVat'
   therapistName: string
+  lockMinutes: number // נעילה אוטומטית אחרי כמה דקות בלי שימוש
 }
 
 export type Scan = {
@@ -61,6 +62,7 @@ export const defaultSettings: Settings = {
   vatExempt: false,
   tableAmount: 'total',
   therapistName: '',
+  lockMinutes: 15,
 }
 
 const KEY = 'mod-report-data-v1'

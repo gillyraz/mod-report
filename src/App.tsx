@@ -1,9 +1,11 @@
 import logo from '../public/favicon.svg'
 import { PROTO, ProtoBar } from './proto'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react'
+import { CalendarDays, Lock, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react'
 import { c, EASE, Toast, useWide } from './ui'
-import { loadData, loadScans, monthKey, saveData, saveScans, type Data, type Scan } from './model'
+import { monthKey, type Data, type Scan } from './model'
+import * as vault from './vault'
+import Gate from './screens/Gate'
 import MonthScreen from './screens/MonthScreen'
 import PatientsScreen from './screens/PatientsScreen'
 import SettingsScreen from './screens/SettingsScreen'
@@ -22,6 +24,10 @@ export type Ctx = {
   wide: boolean
   /** בדסקטופ: המקום בפס העליון שבו כל עמוד מציג את הכותרת והפעולות שלו */
   headerH: number
+  /** נעילת הכלי: המידע יוצא מהזיכרון ונשאר רק מוצפן בתיקייה */
+  lock: () => void
+  /** אחרי מחיקת כל המידע: חזרה לבחירת תיקייה */
+  restart: () => void
 }
 
 export type ToastAction = { label: string; run: () => void }
@@ -44,27 +50,68 @@ export default function App() {
     ro.current.observe(el)
   }, [])
 
+  const [boot, setBoot] = useState<vault.Boot | null>(null)
   useEffect(() => {
-    Promise.all([loadData(), loadScans()]).then(([d, s]) => {
-      setDataRaw(d)
-      setScansRaw(s)
-    })
+    vault.boot().then(setBoot)
   }, [])
+  const dataRef = useRef<Data | null>(null)
+  const scansRef = useRef<Scan[]>([])
+  dataRef.current = data
+  scansRef.current = scans
 
+  // כל שינוי נשמר מוצפן בתיקייה
   const setData = useCallback((fn: (d: Data) => Data) => {
     setDataRaw((d) => {
       const n = fn(d!)
-      saveData(n)
+      vault.save(n, scansRef.current)
+      dataRef.current = n
       return n
     })
   }, [])
   const setScans = useCallback((fn: (s: Scan[]) => Scan[]) => {
     setScansRaw((s) => {
       const n = fn(s)
-      saveScans(n)
+      scansRef.current = n
+      if (dataRef.current) vault.save(dataRef.current, n)
       return n
     })
   }, [])
+  const open = useCallback(({ data: d, scans: s }: { data: Data; scans: Scan[] }) => {
+    setScansRaw(s)
+    setDataRaw(d)
+    setTab('month')
+  }, [])
+  const lock = useCallback(async () => {
+    await vault.flush()
+    vault.lock()
+    setDataRaw(null)
+    setScansRaw([])
+    setBoot({ state: 'locked', label: vault.folderLabel(), needsPermission: false })
+  }, [])
+  const restart = useCallback(() => {
+    setDataRaw(null)
+    setScansRaw([])
+    setBoot({ state: 'setup', legacy: false })
+  }, [])
+
+  // נעילה אוטומטית אחרי זמן בלי שימוש
+  const lockMinutes = data?.settings.lockMinutes ?? 15
+  useEffect(() => {
+    if (!data) return
+    let t = window.setTimeout(lock, lockMinutes * 60_000)
+    const reset = () => (window.clearTimeout(t), (t = window.setTimeout(lock, lockMinutes * 60_000)))
+    const ev = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
+    ev.forEach((e) => addEventListener(e, reset, { passive: true }))
+    return () => (window.clearTimeout(t), ev.forEach((e) => removeEventListener(e, reset)))
+  }, [!!data, lockMinutes, lock])
+  // שמירה מיידית כשהחלון נסגר או מוסתר
+  useEffect(() => {
+    const out = () => document.visibilityState === 'hidden' && vault.flush()
+    addEventListener('visibilitychange', out)
+    addEventListener('pagehide', out)
+    return () => (removeEventListener('visibilitychange', out), removeEventListener('pagehide', out))
+  }, [])
+
   const toast = useCallback((t: string, action?: ToastAction) => {
     setToastText({ text: t, action })
     window.clearTimeout(timer.current)
@@ -72,9 +119,12 @@ export default function App() {
     timer.current = window.setTimeout(() => setToastText(null), action ? 6000 : 4000)
   }, [])
 
-  if (!data) return null
+  useEffect(() => vault.onSaveError(() => toast('השמירה בתיקייה נכשלה. בודקים שהתיקייה עדיין קיימת ושיש גישה אליה.')), [toast])
 
-  const ctx: Ctx = { data, setData, scans, setScans, month, setMonth, toast, go: setTab, wide, headerH }
+  if (!boot) return null
+  if (!data) return <Gate key={boot.state} boot={boot} wide={wide} onOpen={open} />
+
+  const ctx: Ctx = { data, setData, scans, setScans, month, setMonth, toast, go: setTab, wide, headerH, lock, restart }
   const tabs: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: 'month', label: 'החודש', icon: CalendarDays },
     { id: 'patients', label: 'מטופלים', icon: Users },
@@ -121,6 +171,10 @@ export default function App() {
               <ShieldCheck size={15} style={{ color: c.ok }} />
               המידע נשמר רק במחשב הזה
             </span>
+            <button onClick={lock} title="הכלי ננעל, והמידע נשאר מוצפן בתיקייה" style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 14px', borderRadius: 12, border: '1px solid #E1E7F2', background: c.surface, color: c.ink, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <Lock size={16} />
+              נעילה
+            </button>
           </div>
         </header>
         <main style={{ flex: 1, width: '100%', maxWidth: 1184, margin: '0 auto', padding: '0 32px 48px' }}>{screen}</main>
@@ -135,6 +189,10 @@ export default function App() {
         <div style={{ height: 64, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <img src={logo} alt="" width={32} height={32} style={{ borderRadius: 8, boxShadow: '0 0 0 1px rgba(255,255,255,0.25)' }} />
           <span style={{ fontSize: 17, fontWeight: 600 }}>דיווח חודשי</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={lock} aria-label="נעילת הכלי" style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.16)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <Lock size={18} />
+          </button>
         </div>
       </header>
       {PROTO && <ProtoBar patients={data.patients} />}

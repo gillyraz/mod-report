@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
+import { DatabaseBackup, FolderOpen, KeyRound, Lock, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, Card, EASE, Field } from '../ui'
-import { defaultSettings, monthLabel, setVatFrom, vatOf, wipeAll, type Data, type Settings } from '../model'
-import { backupFile, readBackup } from '../backup'
+import * as vault from '../vault'
+import { monthLabel, setVatFrom, vatOf, type Data, type Settings } from '../model'
 import { downloadFiles } from '../files'
 import { PageBar } from './parts'
 import { PROTO } from '../proto'
@@ -31,16 +31,49 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   }
   const set = (patch: Partial<Settings>) => setData((d) => ({ ...d, settings: { ...d.settings, ...patch } }))
 
-  const backup = () => {
-    downloadFiles([backupFile(data)])
-    toast(PROTO ? 'בפרוטוטייפ אין הורדת קבצים' : 'קובץ הגיבוי הורד')
+  const [folder, setFolder] = useState(vault.folderLabel())
+  const [askPw, setAskPw] = useState<Uint8Array | null>(null) // גיבוי שהוצפן בסיסמה אחרת
+  const [backupPw, setBackupPw] = useState('')
+  const [backupErr, setBackupErr] = useState<string>()
+
+  const backup = async () => {
+    const bytes = await vault.backupBytes(data)
+    if (!bytes) return
+    const name = `גיבוי_דיווח_חודשי_${new Date().toISOString().slice(0, 10)}.mrv`
+    if (PROTO) return toast('בפרוטוטייפ אין שמירת קבצים. בגרסה האמיתית נפתח חלון לבחירת מקום הגיבוי.')
+    const picker = (window as unknown as { showSaveFilePicker?: (o: object) => Promise<{ name: string; createWritable: () => Promise<{ write: (b: BlobPart) => Promise<void>; close: () => Promise<void> }> }> }).showSaveFilePicker
+    try {
+      if (picker) {
+        const h = await picker({ suggestedName: name, id: 'mod-report-backup' })
+        const w = await h.createWritable()
+        await w.write(bytes as BlobPart)
+        await w.close()
+        toast(`הגיבוי נשמר בקובץ ${h.name}`)
+      } else {
+        await downloadFiles([new File([bytes as BlobPart], name, { type: 'application/octet-stream' })])
+        toast('קובץ הגיבוי נשמר בתיקיית ההורדות')
+      }
+    } catch {
+      /* המשתמש סגר את החלון */
+    }
   }
-  const restore = async (f: File | undefined) => {
+  const restore = async (f: File | undefined, password?: string) => {
     if (!f) return
-    const d = await readBackup(f)
-    if (!d) return toast('הקובץ הזה אינו קובץ גיבוי של הכלי')
-    if (!data.patients.length) return apply(d)
-    setPending(d) // יש מידע קיים: מבקשים אישור לפני שמחליפים אותו
+    await restoreBytes(new Uint8Array(await f.arrayBuffer()), password)
+  }
+  const restoreBytes = async (bytes: Uint8Array, password?: string) => {
+    const r = await vault.readBackup(bytes, password)
+    if (!r.ok) {
+      if (r.reason === 'invalid') return toast('הקובץ הזה אינו קובץ גיבוי של הכלי')
+      if (password) return setBackupErr('הסיסמה לא נכונה. זו הסיסמה שהייתה בזמן יצירת הגיבוי.')
+      setBackupErr(undefined)
+      return setAskPw(bytes) // הגיבוי נוצר עם סיסמה אחרת
+    }
+    setAskPw(null)
+    setBackupPw('')
+    setBackupErr(undefined)
+    if (!data.patients.length) return apply(r.data)
+    setPending(r.data) // יש מידע קיים: מבקשים אישור לפני שמחליפים אותו
   }
   const apply = (d: Data) => {
     setScans(() => [])
@@ -48,11 +81,33 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
     setPending(null)
     toast(`שוחזרו ${d.patients.length} מטופלים`)
   }
+  const move = async () => {
+    const r = await vault.moveFolder()
+    if (r.ok) return setFolder(r.label), toast(`המידע הועבר לתיקייה ״${r.label}״. העותק בתיקייה הקודמת נשאר מוצפן, ואפשר למחוק אותו.`)
+    if (r.reason === 'existing') toast('בתיקייה הזו כבר שמור מידע של הכלי. בוחרים תיקייה ריקה.')
+    if (r.reason === 'same') toast('זו התיקייה שבה המידע כבר נשמר.')
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <PageBar ctx={ctx} title="הגדרות" sub="שינויים נשמרים אוטומטית." />
       <span aria-hidden style={{ marginTop: -8 }} />
+
+      <Section wide={ctx.wide} title="שמירה ואבטחה" desc="איפה המידע נשמר ומי יכול לפתוח אותו.">
+        <Row icon={<FolderOpen size={18} />} title={vault.isFolder() ? `תיקייה ״${folder}״` : folder} desc={vault.isFolder() ? 'כאן נשמרים המטופלים, הסריקות והטבלאות. כל שינוי נשמר מיד.' : 'המידע נשמר מוצפן בדפדפן, במכשיר הזה בלבד.'}>
+          {vault.isFolder() && vault.canPickFolder() && <Button onClick={move}>העברה לתיקייה אחרת</Button>}
+        </Row>
+        <ChangePassword toast={toast} />
+        <Row icon={<Lock size={18} />} title="נעילה אוטומטית" desc={`הכלי ננעל אחרי ${s.lockMinutes} דקות בלי שימוש.`}>
+          <select aria-label="נעילה אוטומטית אחרי" value={s.lockMinutes} onChange={(e) => set({ lockMinutes: Number(e.target.value) })} style={{ height: 40, borderRadius: 12, border: 'none', background: c.sub, padding: '0 12px', fontSize: 14, fontWeight: 500, color: c.ink, cursor: 'pointer' }}>
+            {[5, 15, 30, 60].map((m) => (
+              <option key={m} value={m}>
+                {m} דקות
+              </option>
+            ))}
+          </select>
+        </Row>
+      </Section>
 
       <Section wide={ctx.wide} title="חישוב" desc="מע״מ והסכום שמופיע בטבלה שנשלחת למשרד.">
         <Field label="שיעור מע״מ" value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={`חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
@@ -89,13 +144,13 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         <Field label="שם המטפל/ת" value={s.therapistName} onChange={(v) => set({ therapistName: v })} hint="מופיע מעל הטבלה החודשית. לא חובה." />
       </Section>
 
-      <Section wide={ctx.wide} title="גיבוי" desc="קובץ עם המטופלים והסכומים, למעבר מחשב או לשחזור.">
+      <Section wide={ctx.wide} title="גיבוי" desc="קובץ נוסף עם המטופלים והסכומים, למעבר מחשב או לשחזור.">
         <p style={{ margin: 0, color: c.ink2, fontSize: 15, lineHeight: 1.6 }}>
-          המידע נשמר רק במחשב הזה. גיבוי שומר את המטופלים והסכומים לקובץ, כדי לעבור למחשב אחר או לשחזר. הסריקות לא נכללות בגיבוי.
+          {vault.isFolder() ? 'העתקה של התיקייה היא הגיבוי המלא, כולל הסריקות. ' : ''}קובץ הגיבוי שומר את המטופלים והסכומים בלבד, מוצפן באותה סיסמה. הסריקות לא נכללות בו.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button icon={<DatabaseBackup size={18} />} onClick={backup}>
-            הורדת קובץ גיבוי
+            שמירת קובץ גיבוי
           </Button>
           <Button icon={<Upload size={18} />} onClick={() => fileIn.current?.click()}>
             שחזור מקובץ
@@ -104,7 +159,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         {pending && (
           <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.warnSoft, borderRadius: 12 }}>
             <span style={{ color: c.warn, fontSize: 15, lineHeight: 1.6 }}>
-              השחזור יחליף את {data.patients.length} המטופלים והסכומים שיש עכשיו במכשיר ב-{pending.patients.length} המטופלים מהקובץ. הסריקות שצורפו יוסרו, כי הן לא נשמרות בגיבוי.
+              השחזור יחליף את {data.patients.length} המטופלים והסכומים שיש עכשיו ב-{pending.patients.length} המטופלים מהקובץ. הסריקות שצורפו יוסרו, כי הן לא נשמרות בגיבוי.
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <Button kind="primary" onClick={() => apply(pending)}>
@@ -116,26 +171,39 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
             </div>
           </div>
         )}
-        <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => (restore(e.target.files?.[0]), (e.target.value = ''))} />
+        {askPw && (
+          <form
+            onSubmit={(e) => (e.preventDefault(), restoreBytes(askPw, backupPw))}
+            style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, background: c.sub, borderRadius: 12 }}
+          >
+            <span style={{ fontSize: 15, lineHeight: 1.6 }}>הגיבוי הזה נוצר עם סיסמה אחרת. מזינים את הסיסמה שהייתה בזמן יצירת הגיבוי.</span>
+            <Field label="הסיסמה של הגיבוי" type="password" value={backupPw} onChange={(v) => (setBackupPw(v), setBackupErr(undefined))} autoFocus />
+            {backupErr && <span role="alert" style={{ color: c.danger, fontSize: 14 }}>{backupErr}</span>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button kind="primary" type="submit">פתיחת הגיבוי</Button>
+              <Button kind="ghost" onClick={() => (setAskPw(null), setBackupPw(''), setBackupErr(undefined))}>ביטול</Button>
+            </div>
+          </form>
+        )}
+        <input ref={fileIn} type="file" accept=".mrv,application/json,.json" hidden onChange={(e) => (restore(e.target.files?.[0]), (e.target.value = ''))} />
       </Section>
 
-      <Section wide={ctx.wide} title="מחיקה" desc="מחיקה של כל המידע מהמחשב הזה.">
+      <Section wide={ctx.wide} title="מחיקה" desc="מחיקה של כל המידע מהתיקייה ומהמחשב הזה.">
         {!confirmWipe ? (
           <Button kind="danger" icon={<Trash2 size={18} />} onClick={() => setConfirmWipe(true)} style={{ alignSelf: 'flex-start' }}>
-            מחיקת כל המידע מהמכשיר
+            מחיקת כל המידע
           </Button>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.dangerBg, borderRadius: 12 }}>
-            <span style={{ color: c.danger, fontSize: 15 }}>כל המטופלים, הסכומים והסריקות יימחקו מהמכשיר הזה, ואי אפשר לשחזר אותם בלי קובץ גיבוי.</span>
+            <span style={{ color: c.danger, fontSize: 15 }}>כל המטופלים, הסכומים והסריקות יימחקו מהתיקייה ומהמחשב, והכלי יחזור למסך הפתיחה. אי אפשר לשחזר אותם בלי קובץ גיבוי. טבלאות שכבר הופקו נשארות בתיקייה.</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <Button
                 kind="primary"
                 style={{ background: c.danger }}
                 onClick={async () => {
-                  await wipeAll()
-                  setScans(() => [])
-                  setData(() => ({ patients: [], months: {}, settings: defaultSettings }))
+                  await vault.wipe()
                   setConfirmWipe(false)
+                  ctx.restart()
                   toast('כל המידע נמחק')
                 }}
               >
@@ -177,5 +245,58 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       </button>
       <span style={{ fontSize: 15 }}>{label}</span>
     </label>
+  )
+}
+
+function Row({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <span style={{ width: 40, height: 40, borderRadius: 14, background: c.primarySoft, color: c.primary, display: 'grid', placeItems: 'center', flex: 'none' }}>{icon}</span>
+      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>{title}</div>
+        <div style={{ color: c.ink3, fontSize: 13, marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function ChangePassword({ toast }: { toast: (t: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [cur, setCur] = useState('')
+  const [next, setNext] = useState('')
+  const [next2, setNext2] = useState('')
+  const [err, setErr] = useState<string>()
+  const [busy, setBusy] = useState(false)
+  const close = () => (setOpen(false), setCur(''), setNext(''), setNext2(''), setErr(undefined))
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (next.length < 8) return setErr('הסיסמה החדשה קצרה מדי. צריך לפחות 8 תווים.')
+    if (next !== next2) return setErr('הסיסמאות החדשות לא זהות.')
+    setBusy(true)
+    const ok = await vault.changePassword(cur, next)
+    setBusy(false)
+    if (!ok) return setErr('הסיסמה הנוכחית לא נכונה.')
+    close()
+    toast('הסיסמה הוחלפה. מעכשיו פותחים את הכלי בסיסמה החדשה.')
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Row icon={<KeyRound size={18} />} title="סיסמה" desc="המידע מוצפן בסיסמה. אין דרך לשחזר סיסמה שנשכחה.">
+        {!open && <Button onClick={() => setOpen(true)}>שינוי סיסמה</Button>}
+      </Row>
+      {open && (
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, background: c.sub, borderRadius: 12 }}>
+          <Field label="הסיסמה הנוכחית" type="password" value={cur} onChange={(v) => (setCur(v), setErr(undefined))} autoFocus />
+          <Field label="סיסמה חדשה" type="password" value={next} onChange={(v) => (setNext(v), setErr(undefined))} hint="לפחות 8 תווים" />
+          <Field label="הקלדה חוזרת של הסיסמה החדשה" type="password" value={next2} onChange={(v) => (setNext2(v), setErr(undefined))} />
+          {err && <span role="alert" style={{ color: c.danger, fontSize: 14 }}>{err}</span>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button kind="primary" type="submit" disabled={busy}>{busy ? 'מצפין מחדש…' : 'שמירת הסיסמה החדשה'}</Button>
+            <Button kind="ghost" onClick={close}>ביטול</Button>
+          </div>
+        </form>
+      )}
+    </div>
   )
 }

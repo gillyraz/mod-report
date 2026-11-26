@@ -5,6 +5,7 @@ import { Button, c, Sheet } from '../ui'
 import { calc, ils, monthLabel, refOf, vatOf, type Patient } from '../model'
 import { elementToPdf } from '../pdf'
 import { canShareFiles, downloadFiles, pdfFile, shareFiles } from '../files'
+import * as vault from '../vault'
 import { PROTO } from '../proto'
 
 const MAX = 20
@@ -65,13 +66,20 @@ function Batch({ ctx, list, index, count, saved, onSaved }: { ctx: Ctx; list: Pa
 
   const save = async () => {
     if (PROTO) {
-      toast('בגרסה האמיתית הטבלה נשמרת עכשיו כקובץ PDF. בפרוטוטייפ אין שמירה.')
+      toast(`בגרסה האמיתית הטבלה נשמרת כקובץ PDF בתיקייה ״${vault.folderLabel()}״ › ${vault.TABLE_DIR}. בפרוטוטייפ אין שמירה.`)
       return onSaved()
     }
     setBusy(true)
     try {
       const f = pdfFile(await elementToPdf(ref.current!), tableName)
-      if (share) await shareFiles([f], `טבלה ${monthLabel(month)}`)
+      const dir = await vault.tablesDir()
+      if (dir) {
+        // נשמרת בתיקייה שבחר, בתת-תיקייה של הטבלאות (PDF רגיל, כדי שאפשר יהיה לשלוח אותה)
+        const w = await (await dir.getFileHandle(f.name, { create: true })).createWritable()
+        await w.write(f)
+        await w.close()
+        toast(`הטבלה נשמרה בתיקייה ״${vault.folderLabel()}״ › ${vault.TABLE_DIR}`)
+      } else if (share) await shareFiles([f], `טבלה ${monthLabel(month)}`)
       else {
         await downloadFiles([f])
         toast('הטבלה נשמרה בתיקיית ההורדות')
