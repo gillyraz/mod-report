@@ -249,8 +249,8 @@ export function Sheet({ title, onClose, children, footer, wide }: { title: strin
   )
 }
 
-export function Card({ children, style, ref }: { children: ReactNode; style?: CSSProperties; ref?: React.Ref<HTMLDivElement> }) {
-  return <div ref={ref} style={{ background: c.surface, borderRadius: 12, border: `1px solid ${c.line}`, ...style }}>{children}</div>
+export function Card({ children, style, ref, id }: { children: ReactNode; style?: CSSProperties; ref?: React.Ref<HTMLDivElement>; id?: string }) {
+  return <div ref={ref} id={id} style={{ background: c.surface, borderRadius: 12, border: `1px solid ${c.line}`, ...style }}>{children}</div>
 }
 
 export function Toast({ text, lift }: { text: string | null; lift?: boolean }) {

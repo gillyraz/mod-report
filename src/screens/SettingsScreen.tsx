@@ -5,7 +5,7 @@ import { Button, c, Card, Field } from '../ui'
 import { defaultSettings, wipeAll, type Settings } from '../model'
 import { backupFile, readBackup } from '../backup'
 import { downloadFiles } from '../files'
-import { PageHead } from './parts'
+import { PageBar } from './parts'
 import { PROTO } from '../proto'
 
 export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
@@ -33,8 +33,8 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720 }}>
-      <PageHead title="הגדרות" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720, paddingTop: ctx.wide ? 24 : 0 }}>
+      <PageBar ctx={ctx} title="הגדרות" middle={<span>שינויים נשמרים אוטומטית.</span>} />
 
       <Section title="חישוב">
         <Field label="שיעור מע״מ" value={vatText} onChange={(v) => (setVatText(v), set({ vatRate: Math.max(0, parseFloat(v) || 0) }))} inputMode="decimal" suffix="%" dirLtr />

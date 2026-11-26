@@ -4,7 +4,7 @@ import type { Ctx } from '../App'
 import { Badge, Button, c, Card } from '../ui'
 import { ils, type Patient } from '../model'
 import PatientForm from './PatientForm'
-import { PageHead } from './parts'
+import { PageBar } from './parts'
 
 export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, toast, wide } = ctx
@@ -26,13 +26,14 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <PageHead
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: wide ? 24 : 0 }}>
+      <PageBar
+        ctx={ctx}
         title="מטופלים"
-        sub="הפרטים מוזנים פעם אחת ומשמשים לכל חודש."
+        middle={<span>הפרטים מוזנים פעם אחת ומשמשים לכל חודש.</span>}
         actions={
           <Button kind="primary" icon={<UserPlus size={18} />} onClick={() => setEditing('new')}>
-            מטופל חדש
+            הוספת מטופל
           </Button>
         }
       />

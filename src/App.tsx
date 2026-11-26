@@ -1,7 +1,7 @@
 import logo from '../public/favicon.svg'
 import { PROTO, ProtoBar } from './proto'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react'
+import { CalendarDays, Settings as SettingsIcon, Users } from 'lucide-react'
 import { c, EASE, Toast, useWide } from './ui'
 import { loadData, loadScans, monthKey, saveData, saveScans, type Data, type Scan } from './model'
 import MonthScreen from './screens/MonthScreen'
@@ -20,12 +20,10 @@ export type Ctx = {
   toast: (t: string) => void
   go: (t: Tab) => void
   wide: boolean
-  layout: Layout
-  slots: { bar: HTMLElement | null; head: HTMLElement | null; strip: HTMLElement | null }
+  /** בדסקטופ: המקום בפס העליון שבו כל עמוד מציג את הכותרת והפעולות שלו */
+  pageSlot: HTMLElement | null
+  headerH: number
 }
-
-/** א: תפריט בצד ימין וכרטיס עליון · ב: תפריט צר ופס פעולות קבוע · ג: פס עליון אחד בלי תפריט צד */
-export type Layout = 'a' | 'b' | 'c'
 
 export default function App() {
   const [data, setDataRaw] = useState<Data | null>(null)
@@ -35,10 +33,16 @@ export default function App() {
   const [toastText, setToastText] = useState<string | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const wide = useWide()
-  const [layout, setLayout] = useState<Layout>('a')
-  const [barEl, setBarEl] = useState<HTMLElement | null>(null)
-  const [headEl, setHeadEl] = useState<HTMLElement | null>(null)
-  const [stripEl, setStripEl] = useState<HTMLElement | null>(null)
+  const [pageEl, setPageEl] = useState<HTMLElement | null>(null)
+  // גובה הפס העליון, כדי שכותרות הטבלה ייצמדו מתחתיו
+  const [headerH, setHeaderH] = useState(64)
+  const ro = useRef<ResizeObserver | null>(null)
+  const headerRef = useCallback((el: HTMLElement | null) => {
+    ro.current?.disconnect()
+    if (!el) return
+    ro.current = new ResizeObserver(() => setHeaderH(el.offsetHeight))
+    ro.current.observe(el)
+  }, [])
 
   useEffect(() => {
     Promise.all([loadData(), loadScans()]).then(([d, s]) => {
@@ -69,7 +73,7 @@ export default function App() {
 
   if (!data) return null
 
-  const ctx: Ctx = { data, setData, scans, setScans, month, setMonth, toast, go: setTab, wide, layout, slots: { bar: barEl, head: headEl, strip: stripEl } }
+  const ctx: Ctx = { data, setData, scans, setScans, month, setMonth, toast, go: setTab, wide, pageSlot: pageEl, headerH }
   const tabs: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: 'month', label: 'החודש', icon: CalendarDays },
     { id: 'patients', label: 'מטופלים', icon: Users },
@@ -84,12 +88,12 @@ export default function App() {
     </>
   )
 
-  // דסקטופ, פריסה ג: פס עליון אחד עם הלשוניות, בורר החודש והפעולות
-  if (wide && layout === 'c')
+  // דסקטופ: פס עליון קבוע עם הלשוניות, ומתחתיו פס העמוד (כותרת ופעולות של העמוד הנוכחי)
+  if (wide)
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {PROTO && <ProtoBar patients={data.patients} layout={layout} setLayout={setLayout} />}
-        <header style={{ position: 'sticky', top: 0, zIndex: 20, background: c.surface, borderBottom: `1px solid ${c.line}` }}>
+        {PROTO && <ProtoBar />}
+        <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 20, background: c.surface, borderBottom: `1px solid ${c.line}` }}>
           <div style={{ maxWidth: 1184, margin: '0 auto', height: 64, padding: '0 32px', display: 'flex', alignItems: 'center', gap: 32 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <img src={logo} alt="" width={32} height={32} style={{ borderRadius: 8 }} />
@@ -111,72 +115,13 @@ export default function App() {
                 )
               })}
             </nav>
-            <div ref={setHeadEl} style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 16 }} />
           </div>
-          <div ref={setStripEl} />
+          <div ref={setPageEl} />
         </header>
-        <main style={{ flex: 1, width: '100%', maxWidth: 1184, margin: '0 auto', padding: '32px 32px 48px' }}>{screen}</main>
+        <main style={{ flex: 1, width: '100%', maxWidth: 1184, margin: '0 auto', padding: '0 32px 48px' }}>{screen}</main>
         <Toast text={toastText} />
       </div>
     )
-
-  // דסקטופ, פריסות א ו-ב: תפריט בצד ימין (ב: צר, אייקונים בלבד)
-  if (wide) {
-    const narrow = layout === 'b'
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex' }}>
-        <aside style={{ position: 'sticky', top: 0, height: '100vh', flex: `0 0 ${narrow ? 80 : 232}px`, background: c.primary, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: narrow ? 'center' : 'stretch', padding: narrow ? '16px 8px' : '24px 16px', gap: narrow ? 24 : 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: narrow ? 0 : '0 8px' }}>
-            <img src={logo} alt="דיווח חודשי" width={32} height={32} style={{ borderRadius: 8, boxShadow: '0 0 0 1px rgba(255,255,255,0.25)' }} />
-            {!narrow && <span style={{ fontSize: 17, fontWeight: 600 }}>דיווח חודשי</span>}
-          </div>
-          <nav aria-label="ניווט ראשי" style={{ display: 'flex', flexDirection: 'column', gap: narrow ? 8 : 4, alignSelf: 'stretch' }}>
-            {tabs.map((t) => {
-              const on = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  aria-current={on ? 'page' : undefined}
-                  style={{
-                    display: 'flex',
-                    flexDirection: narrow ? 'column' : 'row',
-                    alignItems: 'center',
-                    justifyContent: narrow ? 'center' : 'flex-start',
-                    gap: narrow ? 4 : 12,
-                    height: narrow ? 64 : 44,
-                    padding: narrow ? 0 : '0 12px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: on ? 'rgba(255,255,255,0.14)' : 'transparent',
-                    color: on ? '#fff' : 'rgba(255,255,255,0.76)',
-                    fontSize: narrow ? 12 : 15,
-                    fontWeight: on ? 600 : 400,
-                    cursor: 'pointer',
-                    textAlign: 'start',
-                    transition: `background 200ms ${EASE}, color 200ms ${EASE}`,
-                  }}
-                >
-                  <t.icon size={narrow ? 22 : 20} strokeWidth={on ? 2.25 : 1.75} />
-                  {t.label}
-                </button>
-              )
-            })}
-          </nav>
-          <div title="המידע נשמר רק במכשיר הזה" style={{ marginTop: 'auto', display: 'flex', gap: 8, alignItems: 'flex-start', padding: narrow ? 0 : '0 8px', fontSize: 13, lineHeight: 1.5, color: 'rgba(255,255,255,0.76)' }}>
-            <ShieldCheck size={narrow ? 20 : 16} style={{ flex: '0 0 auto', marginTop: 2, color: '#7FD1AE' }} />
-            {!narrow && <span>המידע נשמר רק במכשיר הזה</span>}
-          </div>
-        </aside>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {PROTO && <ProtoBar patients={data.patients} layout={layout} setLayout={setLayout} />}
-          {narrow && <div ref={setBarEl} style={{ position: 'sticky', top: 0, zIndex: 15 }} />}
-          <main style={{ flex: 1, width: '100%', maxWidth: 1184, margin: '0 auto', padding: '32px 32px 48px' }}>{screen}</main>
-        </div>
-        <Toast text={toastText} />
-      </div>
-    )
-  }
 
   // נייד: כותרת למעלה ותפריט בתחתית
   return (
@@ -187,7 +132,7 @@ export default function App() {
           <span style={{ fontSize: 17, fontWeight: 600 }}>דיווח חודשי</span>
         </div>
       </header>
-      {PROTO && <ProtoBar patients={data.patients} />}
+      {PROTO && <ProtoBar />}
       <main style={{ flex: 1, width: '100%', padding: '16px 16px 104px' }}>{screen}</main>
       <nav
         aria-label="ניווט ראשי"

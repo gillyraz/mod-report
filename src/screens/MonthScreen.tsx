@@ -1,39 +1,38 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { Check, CheckCircle2, FileOutput, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, Upload, UserPlus } from 'lucide-react'
+import { Check, CheckCircle2, FileOutput, Pencil, Percent, ShieldCheck, Upload, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card, EASE, Stepper } from '../ui'
-import { calc, ils, monthLabel, statusOf, uid, type Entry, type Patient, type Scan } from '../model'
-import { makeThumb } from '../pdf'
+import { calc, ils, type Entry, type Patient } from '../model'
 import { readBackup } from '../backup'
-import { MonthSwitcher } from './parts'
+import { MonthSwitcher, PageBar } from './parts'
 import PatientForm from './PatientForm'
-import AssignSheet from './AssignSheet'
-import ScanSheet from './ScanSheet'
 import ReportSheet from './ReportSheet'
 
-const ACCEPT = 'application/pdf,image/jpeg,image/png'
+type Sort = 'added' | 'first' | 'last'
+const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? ''
+const lastName = (n: string) => n.trim().split(/\s+/).slice(1).join(' ') || n
+const hasSessions = (e: Entry | undefined) => (e?.signed ?? 0) + (e?.cancelled ?? 0) > 0
 
 export default function MonthScreen({ ctx }: { ctx: Ctx }) {
-  const { data, setData, scans, setScans, month, setMonth, toast, wide, layout, slots } = ctx
+  const { data, setData, month, setMonth, toast, wide, headerH } = ctx
   const entries = data.months[month] ?? {}
   const [adding, setAdding] = useState(false)
-  const [assigning, setAssigning] = useState(false)
-  const [viewScan, setViewScan] = useState<{ scan: Scan; patient: Patient } | null>(null)
-  const [reporting, setReporting] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const bulkInput = useRef<HTMLInputElement>(null)
-  const oneInput = useRef<HTMLInputElement>(null)
-  const target = useRef<string | null>(null)
+  const [sort, setSort] = useState<Sort>('added')
+  // מצב בחירה להפקת דיווח: מי ייכלל בטבלה
+  const [selecting, setSelecting] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [reporting, setReporting] = useState<Patient[] | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
 
-  const patients = useMemo(
-    () => data.patients.filter((p) => !p.archived || entries[p.id]).sort((a, b) => a.name.localeCompare(b.name, 'he')),
-    [data.patients, entries],
-  )
-  const assignedIds = new Set(Object.values(entries).map((e) => e.scanId).filter(Boolean))
-  const unassigned = scans.filter((s) => s.month === month && !assignedIds.has(s.id))
-  const ready = patients.filter((p) => statusOf(entries[p.id]) === 'ready')
+  const patients = useMemo(() => {
+    const list = data.patients.filter((p) => !p.archived || entries[p.id])
+    if (sort === 'first') return [...list].sort((a, b) => firstName(a.name).localeCompare(firstName(b.name), 'he'))
+    if (sort === 'last') return [...list].sort((a, b) => lastName(a.name).localeCompare(lastName(b.name), 'he'))
+    return list // סדר ההוספה: מטופל חדש תמיד בסוף
+  }, [data.patients, entries, sort])
+  const eligible = patients.filter((p) => hasSessions(entries[p.id]))
   const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], data.settings).total, 0)
+  const pct = patients.length ? eligible.length / patients.length : 0
 
   const setEntry = (pid: string, fn: (e: Entry) => Entry) =>
     setData((d) => {
@@ -42,373 +41,265 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       return { ...d, months: { ...d.months, [month]: { ...m, [pid]: fn(cur) } } }
     })
 
-  const attach = (pid: string, scanId: string | undefined) => {
-    const old = entries[pid]?.scanId
-    setEntry(pid, (e) => ({ ...e, scanId }))
-    if (old && old !== scanId) setScans((s) => s.filter((x) => x.id !== old))
-  }
-
-  const guess = (name: string): Patient | undefined => {
-    const n = name.replace(/\.[^.]+$/, '')
-    return patients.find((p) => !entries[p.id]?.scanId && ((p.referralNo && n.includes(p.referralNo)) || (p.fileNo && n.includes(p.fileNo)) || n.includes(p.name)))
-  }
-
-  const importFiles = async (files: FileList | File[] | null, forPatient?: string) => {
-    if (!files?.length) return
-    setBusy(true)
-    const made: Scan[] = []
-    for (const f of Array.from(files)) {
-      made.push({ id: uid(), name: f.name, type: f.type || 'application/pdf', blob: f, thumb: await makeThumb(f), month, addedAt: Date.now() })
-    }
-    setScans((s) => [...s, ...made])
-    setBusy(false)
-    if (forPatient) {
-      attach(forPatient, made[0].id)
-      toast('הסריקה צורפה')
-      return
-    }
-    let auto = 0
-    for (const s of made) {
-      const p = guess(s.name)
-      if (p) {
-        attach(p.id, s.id)
-        auto++
-      }
-    }
-    if (auto === made.length) toast(auto === 1 ? 'הסריקה שויכה אוטומטית לפי שם הקובץ' : `${auto} סריקות שויכו אוטומטית לפי שם הקובץ`)
-    else setAssigning(true)
-  }
-
-  // כשהכרטיס הראשי יוצא מהמסך מופיע פס מצומצם
-  const headRef = useRef<HTMLDivElement>(null)
-  const [compact, setCompact] = useState(false)
-  const hasPatients = data.patients.some((p) => !p.archived)
+  // מטופל חדש: גלילה אל השורה שלו והדגשה קצרה
   useEffect(() => {
-    const el = headRef.current
-    if (!el) return
-    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), { rootMargin: `-${wide ? 0 : 64}px 0px 0px 0px` })
-    io.observe(el)
-    return () => io.disconnect()
-  }, [wide, hasPatients, layout])
+    if (!flash) return
+    const el = document.getElementById(`row-${flash}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const t = window.setTimeout(() => setFlash(null), 2400)
+    return () => window.clearTimeout(t)
+  }, [flash])
 
-  // גרסת הניסיון: ייבוא סריקות לדוגמה
-  const importRef = useRef(importFiles)
-  importRef.current = importFiles
+  // מטופל שאין לו מפגשים יוצא מהבחירה
   useEffect(() => {
-    const on = (e: Event) => void importRef.current((e as CustomEvent<File[]>).detail)
-    window.addEventListener('proto-import', on)
-    return () => window.removeEventListener('proto-import', on)
-  }, [])
+    if (!selecting) return
+    setPicked((s) => new Set([...s].filter((id) => hasSessions(entries[id]))))
+  }, [entries, selecting])
+
+  const startSelect = () => {
+    setPicked(new Set(eligible.map((p) => p.id)))
+    setSelecting(true)
+  }
+  const toggle = (id: string) =>
+    setPicked((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  const allOn = eligible.length > 0 && eligible.every((p) => picked.has(p.id))
+
+  const addForm = adding && (
+    <PatientForm
+      onClose={() => setAdding(false)}
+      onSave={(p) => {
+        setData((d) => ({ ...d, patients: [...d.patients, p] }))
+        setAdding(false)
+        setFlash(p.id)
+        toast(`${p.name} נוסף לרשימה`)
+      }}
+    />
+  )
 
   if (data.patients.filter((p) => !p.archived).length === 0) {
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: wide ? 32 : 0 }}>
+        {wide && <PageBar ctx={ctx} title="החודש" />}
         <Welcome ctx={ctx} onAdd={() => setAdding(true)} />
-        {adding && (
-          <PatientForm
-            onClose={() => setAdding(false)}
-            onSave={(p) => {
-              setData((d) => ({ ...d, patients: [...d.patients, p] }))
-              setAdding(false)
-              toast(`${p.name} נוסף. אפשר להוסיף עוד מטופלים מלשונית ״מטופלים״.`)
-            }}
-          />
-        )}
-      </>
+        {addForm}
+      </div>
     )
   }
 
-  const pct = patients.length ? ready.length / patients.length : 0
-  const actions = (small: boolean) => (
-    <div style={{ display: 'flex', gap: 8, flex: wide ? undefined : small ? undefined : 1 }}>
-      <Button icon={<FileUp size={small ? 16 : 18} />} onClick={() => bulkInput.current?.click()} disabled={busy} style={{ flex: wide || small ? undefined : 1, ...(small ? { height: 36, padding: '0 12px', fontSize: 14 } : {}) }}>
-        {busy ? 'קורא קבצים…' : 'ייבוא סריקות'}
-      </Button>
-      <Button kind="primary" icon={<FileOutput size={small ? 16 : 18} />} onClick={() => setReporting(true)} disabled={!ready.length} style={{ flex: wide || small ? undefined : 1, ...(small ? { height: 36, padding: '0 12px', fontSize: 14 } : {}) }}>
-        הפקת דיווח
-      </Button>
-    </div>
+  const status = (
+    <>
+      <span style={{ whiteSpace: 'nowrap' }}>
+        <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
+          {eligible.length} מתוך {patients.length}
+        </b>{' '}
+        עם מפגשים
+      </span>
+      <div style={{ flex: 1, minWidth: 80 }}>
+        <Progress pct={pct} />
+      </div>
+      <span style={{ whiteSpace: 'nowrap' }}>
+        סה״כ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
+      </span>
+      <VatInline ctx={ctx} />
+    </>
   )
 
+  const selectActions = (
+    <>
+      <Button kind="primary" icon={<FileOutput size={18} />} disabled={!picked.size} onClick={() => setReporting(patients.filter((p) => picked.has(p.id)))}>
+        {picked.size === 1 ? 'הפקת טבלה למטופל אחד' : `הפקת טבלה ל-${picked.size} מטופלים`}
+      </Button>
+      <Button kind="ghost" icon={<X size={18} />} onClick={() => setSelecting(false)}>
+        ביטול
+      </Button>
+    </>
+  )
+
+  const COLS = `${selecting ? '40px ' : ''}minmax(200px, 1.6fr) 136px 136px minmax(220px, 1.4fr)`
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {wide && layout === 'b' && slots.bar && createPortal(
-        // פריסה ב: פס פעולות קבוע למעלה
-        <div style={{ background: c.surface, borderBottom: `1px solid ${c.line}` }}>
-          <div style={{ maxWidth: 1184, margin: '0 auto', padding: '16px 32px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>החודש</h1>
-              <MonthSwitcher month={month} setMonth={setMonth} />
-            </div>
-            <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 14, color: c.ink2, flexWrap: 'wrap' }}>
-                <span>
-                  <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
-                    {ready.length} מתוך {patients.length}
-                  </b>{' '}
-                  מוכנים לשליחה
-                </span>
-                <span>
-                  סה״כ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
-                </span>
-                <VatInline ctx={ctx} />
-              </div>
-              <Progress pct={pct} />
-            </div>
-            {actions(false)}
-          </div>
-        </div>,
-        slots.bar,
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: wide ? 0 : 24 }}>
+      <PageBar
+        ctx={ctx}
+        title="החודש"
+        lead={<MonthSwitcher month={month} setMonth={setMonth} />}
+        middle={wide ? status : <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>{status}</div>}
+        actions={
+          selecting ? (
+            wide ? selectActions : undefined
+          ) : (
+            <Button kind="primary" icon={<FileOutput size={18} />} onClick={startSelect} disabled={!eligible.length} style={{ flex: wide ? undefined : 1 }}>
+              הפקת דיווח
+            </Button>
+          )
+        }
+      />
 
-      {wide && layout === 'c' && slots.head && createPortal(
-        <>
-          <MonthSwitcher month={month} setMonth={setMonth} />
-          {actions(true)}
-        </>,
-        slots.head,
-      )}
-      {wide && layout === 'c' && slots.strip && createPortal(
-        // פריסה ג: פס התקדמות דק מתחת לפס העליון
-        <div style={{ borderTop: `1px solid ${c.line}`, background: c.surface }}>
-          <div style={{ maxWidth: 1184, margin: '0 auto', padding: '8px 32px', display: 'flex', alignItems: 'center', gap: 24, fontSize: 14, color: c.ink2 }}>
-            <span style={{ whiteSpace: 'nowrap' }}>
-              <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
-                {ready.length} מתוך {patients.length}
-              </b>{' '}
-              מוכנים לשליחה
-            </span>
-            <div style={{ flex: 1 }}>
-              <Progress pct={pct} />
-            </div>
-            <span style={{ whiteSpace: 'nowrap' }}>
-              סה״כ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
-            </span>
-            <VatInline ctx={ctx} />
-          </div>
-        </div>,
-        slots.strip,
-      )}
-
-      {(!wide || layout === 'a') && (
-        <>
-      {/* פס מצומצם שנצמד למעלה כשהכרטיס הראשי יוצא מהמסך */}
-      <div style={{ position: 'sticky', top: wide ? 0 : 64, height: 0, zIndex: 15, marginBottom: -24 }}>
-        <div
-          aria-hidden={!compact}
-          inert={!compact}
-          style={{
-            marginInline: wide ? -32 : -16,
-            background: c.surface,
-            borderBottom: `1px solid ${c.line}`,
-            boxShadow: '0 4px 16px rgba(16,22,34,0.08)',
-            padding: wide ? '12px 32px' : '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: wide ? 24 : 8,
-            transform: compact ? 'translateY(0)' : 'translateY(-110%)',
-            opacity: compact ? 1 : 0,
-            pointerEvents: compact ? 'auto' : 'none',
-            transition: `transform 320ms ${EASE}, opacity 200ms ${EASE}`,
-          }}
-        >
-          {wide && <span style={{ fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap' }}>{monthLabel(month)}</span>}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: wide ? 16 : 8, minWidth: 0 }}>
-            <span style={{ fontSize: 14, color: c.ink2, whiteSpace: 'nowrap' }}>
-              <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
-                {ready.length} מתוך {patients.length}
-              </b>{' '}
-              מוכנים
-            </span>
-            {wide && <Progress pct={pct} width={120} />}
-            {wide && (
-              <span style={{ fontSize: 14, color: c.ink2, whiteSpace: 'nowrap' }}>
-                סה״כ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
-              </span>
-            )}
-          </div>
-          {actions(true)}
-        </div>
-      </div>
-
-      {/* כותרת החודש, סטטוס ופעולות ראשיות */}
-      <Card style={{ padding: wide ? 24 : 16, display: 'flex', flexDirection: 'column', gap: wide ? 24 : 16 }}>
-        <div ref={wide ? headRef : undefined} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            {wide && <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600 }}>החודש</h1>}
-            <MonthSwitcher month={month} setMonth={setMonth} />
-          </div>
-          {wide && actions(false)}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {ready.length} מתוך {patients.length}
-            </span>
-            <span style={{ color: c.ink2, fontSize: 15 }}>מוכנים לשליחה</span>
-          </div>
-          <Progress pct={pct} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 14, color: c.ink2, minHeight: 32 }}>
+      {/* כותרת הרשימה וכותרות העמודות: נשארות במקום, רק השורות נגללות */}
+      <div style={{ position: wide ? 'sticky' : 'static', top: headerH, zIndex: 10, background: c.bg, paddingTop: wide ? 24 : 0, paddingBottom: 8, marginInline: wide ? -8 : 0, paddingInline: wide ? 8 : 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {selecting && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#E8EEF6', color: c.primary, borderRadius: 12, fontSize: 15 }}>
+            <CheckCircle2 size={20} style={{ flex: '0 0 20px' }} />
             <span>
-              סה״כ לחודש: <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
+              מסמנים את המטופלים שייכנסו לטבלה. מטופל בלי מפגשים החודש לא ניתן לסימון.
             </span>
-            <VatInline ctx={ctx} />
           </div>
-        </div>
-        {!wide && <div ref={headRef}>{actions(false)}</div>}
-      </Card>
-
-        </>
-      )}
-
-      {unassigned.length > 0 && (
-        <button
-          onClick={() => setAssigning(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: c.warnBg, color: c.warn, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer', textAlign: 'start' }}
-        >
-          <FileStack size={20} />
-          <span style={{ flex: 1 }}>
-            {unassigned.length === 1 ? (<><b>סריקה אחת</b> ממתינה לשיוך למטופל</>) : (<><b>{unassigned.length} סריקות</b> ממתינות לשיוך למטופל</>)}
-          </span>
-          <span style={{ fontWeight: 600, textDecoration: 'underline' }}>לשיוך</span>
-        </button>
-      )}
-
-      {/* רשימת המטופלים */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingInlineStart: wide ? 24 : 0, marginBottom: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
-            מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {patients.length}</span>
-          </h2>
-          <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)}>
-            הוספת מטופל
-          </Button>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
+              מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {patients.length}</span>
+            </h2>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.ink2 }}>
+              מיון
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as Sort)}
+                style={{ height: 32, borderRadius: 8, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 8px', fontSize: 14 }}
+              >
+                <option value="added">לפי סדר ההוספה</option>
+                <option value="first">לפי שם פרטי</option>
+                <option value="last">לפי שם משפחה</option>
+              </select>
+            </label>
+          </div>
+          {!selecting && (
+            <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)}>
+              הוספת מטופל
+            </Button>
+          )}
         </div>
         {wide && (
-          <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, padding: '0 24px', fontSize: 13, color: c.ink2, fontWeight: 500 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, alignItems: 'center', padding: '0 24px', fontSize: 13, color: c.ink2, fontWeight: 500 }}>
+            {selecting && (
+              <Check4
+                checked={allOn}
+                mixed={!allOn && picked.size > 0}
+                disabled={!eligible.length}
+                label={allOn ? 'ביטול הסימון של כולם' : 'סימון כל המטופלים עם מפגשים'}
+                onChange={() => setPicked(allOn ? new Set() : new Set(eligible.map((p) => p.id)))}
+              />
+            )}
             <span>מטופל</span>
             <span>מפגשים חתומים</span>
             <span>ביטולים ללא הודעה</span>
             <span>לכתוב בטופס</span>
-            <span>סריקה</span>
           </div>
         )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: !wide && selecting ? 88 : 0 }}>
         {patients.map((p) => (
           <Row
             key={p.id}
             p={p}
             e={entries[p.id]}
             ctx={ctx}
-            scan={scans.find((s) => s.id === entries[p.id]?.scanId)}
+            cols={COLS}
+            flash={flash === p.id}
+            select={selecting ? { on: picked.has(p.id), can: hasSessions(entries[p.id]), toggle: () => toggle(p.id) } : undefined}
             onEntry={(fn) => setEntry(p.id, fn)}
-            onAttach={() => {
-              target.current = p.id
-              oneInput.current?.click()
-            }}
-            onView={(scan) => setViewScan({ scan, patient: p })}
           />
         ))}
       </div>
 
-      <input ref={bulkInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => (importFiles(e.target.files), (e.target.value = ''))} />
-      <input ref={oneInput} type="file" accept={ACCEPT} hidden onChange={(e) => (importFiles(e.target.files, target.current ?? undefined), (e.target.value = ''))} />
+      {/* נייד: פעולות הבחירה בפס תחתון */}
+      {!wide && selecting && (
+        <div style={{ position: 'fixed', insetInline: 0, bottom: 'calc(64px + env(safe-area-inset-bottom))', zIndex: 18, background: c.surface, borderTop: `1px solid ${c.line}`, padding: '12px 16px', display: 'flex', gap: 8 }}>
+          {selectActions}
+        </div>
+      )}
 
-      {adding && (
-        <PatientForm
-          onClose={() => setAdding(false)}
-          onSave={(p) => {
-            setData((d) => ({ ...d, patients: [...d.patients, p] }))
-            setAdding(false)
-            toast(`${p.name} נוסף לרשימה`)
+      {addForm}
+      {reporting && (
+        <ReportSheet
+          ctx={ctx}
+          list={reporting}
+          onClose={() => setReporting(null)}
+          onDone={() => {
+            setReporting(null)
+            setSelecting(false)
           }}
         />
       )}
-      {assigning && (
-        <AssignSheet
-          scans={unassigned}
-          patients={patients}
-          entries={entries}
-          onSave={(choices) => {
-            const del = Object.keys(choices).filter((sid) => choices[sid] === 'delete')
-            const pairs = Object.entries(choices).filter(([, v]) => v !== 'delete')
-            for (const [sid, pid] of pairs) attach(pid, sid)
-            if (del.length) setScans((s) => s.filter((x) => !del.includes(x.id)))
-            setAssigning(false)
-            const left = unassigned.length - pairs.length - del.length
-            toast(left > 0 ? `${left === 1 ? 'סריקה אחת עדיין ממתינה' : `${left} סריקות עדיין ממתינות`} לשיוך` : 'כל הסריקות שויכו')
-          }}
-          onClose={() => setAssigning(false)}
-        />
-      )}
-      {viewScan && (
-        <ScanSheet
-          scan={viewScan.scan}
-          patient={viewScan.patient}
-          onReplace={() => {
-            target.current = viewScan.patient.id
-            setViewScan(null)
-            oneInput.current?.click()
-          }}
-          onRemove={() => {
-            attach(viewScan.patient.id, undefined)
-            setScans((s) => s.filter((x) => x.id !== viewScan.scan.id))
-            setViewScan(null)
-            toast('הסריקה הוסרה')
-          }}
-          onClose={() => setViewScan(null)}
-        />
-      )}
-      {reporting && <ReportSheet ctx={ctx} ready={ready} patients={patients} onClose={() => setReporting(false)} />}
     </div>
   )
 }
 
-const COLS = 'minmax(180px, 1.6fr) 136px 136px minmax(200px, 1.4fr) 168px'
+/** תיבת סימון בגודל נוח ללחיצה */
+function Check4({ checked, mixed, disabled, label, onChange }: { checked: boolean; mixed?: boolean; disabled?: boolean; label: string; onChange: () => void }) {
+  return (
+    <button
+      role="checkbox"
+      aria-checked={mixed ? 'mixed' : checked}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onChange}
+      style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', padding: 0, cursor: disabled ? 'not-allowed' : 'pointer' }}
+    >
+      <span
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 6,
+          border: `2px solid ${disabled ? c.line : checked || mixed ? c.primary : c.ink3}`,
+          background: checked || mixed ? c.primary : c.surface,
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: `background 160ms ${EASE}, border-color 160ms ${EASE}`,
+        }}
+      >
+        {checked ? <Check size={16} strokeWidth={3} /> : mixed ? <span style={{ width: 10, height: 2, background: '#fff', borderRadius: 1 }} /> : null}
+      </span>
+    </button>
+  )
+}
 
 function Row({
   p,
   e,
   ctx,
-  scan,
+  cols,
+  flash,
+  select,
   onEntry,
-  onAttach,
-  onView,
 }: {
   p: Patient
   e: Entry | undefined
   ctx: Ctx
-  scan: Scan | undefined
+  cols: string
+  flash: boolean
+  select?: { on: boolean; can: boolean; toggle: () => void }
   onEntry: (fn: (e: Entry) => Entry) => void
-  onAttach: () => void
-  onView: (s: Scan) => void
 }) {
   const { wide, data } = ctx
-  const st = statusOf(e)
   const r = calc(p, e, data.settings)
   const has = r.sessions > 0
+  const dim = select && !select.can
 
   const who = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, fontSize: 16 }}>{p.name}</span>
-        {st === 'ready' && (
+        {has && (
           <Badge tone="ok">
             <CheckCircle2 size={14} /> מוכן
           </Badge>
         )}
-        {st === 'amounts' && <Badge tone="warn">{has ? 'חסרה סריקה' : 'חסרים מפגשים'}</Badge>}
+        {dim && <span style={{ fontSize: 13, color: c.ink2 }}>אין מפגשים החודש</span>}
       </div>
       <span style={{ fontSize: 13, color: c.ink2, fontVariantNumeric: 'tabular-nums' }}>
         תיק {p.fileNo} · הפנייה {p.referralNo} · {ils(p.rate)} למפגש
       </span>
     </div>
-  )
-
-  const steppers = (
-    <>
-      <Stepper label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
-      <Stepper label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
-    </>
   )
 
   const sums = (
@@ -418,38 +309,37 @@ function Row({
     </div>
   )
 
-  const scanCell = scan ? (
-    <button
-      onClick={() => onView(scan)}
-      title="הצגת הסריקה"
-      style={{ display: 'flex', alignItems: 'center', gap: 8, height: 56, padding: 4, paddingInlineEnd: 12, background: c.surface, border: `1px solid ${c.line}`, borderRadius: 8, cursor: 'pointer', color: c.ink, fontSize: 14, minWidth: 0 }}
-    >
-      {scan.thumb ? <img src={scan.thumb} alt="" style={{ width: 36, height: 46, objectFit: 'cover', objectPosition: 'top', borderRadius: 4, border: `1px solid ${c.line}` }} /> : <Paperclip size={18} />}
-      <span>סריקה מצורפת</span>
-    </button>
-  ) : (
-    <Button icon={<Paperclip size={18} />} onClick={onAttach} style={{ height: 56 }}>
-      צירוף סריקה
-    </Button>
-  )
+  const box = select && <Check4 checked={select.on} disabled={!select.can} label={select.can ? `הכללת ${p.name} בטבלה` : `${p.name}: אין מפגשים החודש`} onChange={select.toggle} />
+
+  const cardStyle = {
+    opacity: dim ? 0.45 : 1,
+    boxShadow: flash ? `0 0 0 2px ${c.ok}` : select?.on ? `0 0 0 2px ${c.primary}` : undefined,
+    background: flash ? c.okBg : c.surface,
+    transition: `opacity 240ms ${EASE}, box-shadow 240ms ${EASE}, background 600ms ${EASE}`,
+  }
 
   if (wide)
     return (
-      <Card style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, alignItems: 'center', padding: '16px 24px' }}>
+      <Card id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, alignItems: 'center', padding: '16px 24px', ...cardStyle }}>
+        {box}
         {who}
         <Stepper hideLabel label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
         <Stepper hideLabel label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
         {sums}
-        {scanCell}
       </Card>
     )
 
   return (
-    <Card style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {who}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>{steppers}</div>
+    <Card style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, ...cardStyle }}>
+      <div id={`row-${p.id}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        {box}
+        <div style={{ flex: 1, minWidth: 0 }}>{who}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <Stepper label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
+        <Stepper label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
+      </div>
       {sums}
-      {scanCell}
     </Card>
   )
 }
