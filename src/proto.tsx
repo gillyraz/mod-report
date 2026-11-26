@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { c } from './ui'
 import { FlaskConical } from 'lucide-react'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { Button } from './ui'
@@ -42,7 +41,6 @@ export function ProtoBar({ patients }: { patients: Patient[] }) {
       <div style={{ maxWidth: 1184, margin: '0 auto', padding: '8px 32px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 14 }}>
         <FlaskConical size={18} style={{ flex: '0 0 18px' }} />
         <span style={{ flex: 1, minWidth: 200 }}>גרסת ניסיון. המידע נמחק ברענון הדף, וקבצים לא נשמרים באמת.</span>
-        <SelSwitch />
         <Button onClick={sample} disabled={busy} style={{ height: 32, fontSize: 14 }}>
           {busy ? 'מכין…' : 'ייבוא סריקות לדוגמה'}
         </Button>
@@ -51,25 +49,3 @@ export function ProtoBar({ patients }: { patients: Patient[] }) {
   )
 }
 
-/** מתג בין שתי חלופות לפעולות הבחירה בהפקת דיווח */
-function SelSwitch() {
-  const [v, setV] = useState<'header' | 'float'>('header')
-  const pick = (x: 'header' | 'float') => {
-    setV(x)
-    window.dispatchEvent(new CustomEvent('proto-sel', { detail: x }))
-  }
-  return (
-    <div role="radiogroup" aria-label="פעולות הבחירה" style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid #F1DDB4', borderRadius: 8, padding: 2 }}>
-      {(
-        [
-          ['header', 'בחירה א · בכותרת הרשימה'],
-          ['float', 'בחירה ב · פס צף'],
-        ] as const
-      ).map(([k, l]) => (
-        <button key={k} role="radio" aria-checked={v === k} onClick={() => pick(k)} style={{ height: 28, padding: '0 12px', borderRadius: 6, border: 'none', background: v === k ? c.primary : 'transparent', color: v === k ? '#fff' : c.ink, fontSize: 13, fontWeight: v === k ? 600 : 400, cursor: 'pointer' }}>
-          {l}
-        </button>
-      ))}
-    </div>
-  )
-}

@@ -44,13 +44,6 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const hasScan = (id: string) => scans.some((x) => x.id === entries[id]?.scanId)
   const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id)
   const eligible = patients.filter((p) => canReport(p.id))
-  // גרסת הניסיון: מעבר בין שתי חלופות לפעולות הבחירה
-  const [selUi, setSelUi] = useState<'header' | 'float'>('header')
-  useEffect(() => {
-    const on = (e: Event) => setSelUi((e as CustomEvent<'header' | 'float'>).detail)
-    window.addEventListener('proto-sel', on)
-    return () => window.removeEventListener('proto-sel', on)
-  }, [])
   const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], data.settings).total, 0)
   const pct = patients.length ? eligible.length / patients.length : 0
 
@@ -227,18 +220,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             <span style={{ fontWeight: 600, textDecoration: 'underline' }}>לשיוך</span>
           </button>
         )}
-        {selecting && wide && selUi === 'header' ? (
-          // חלופה א: שורת הכותרת של הרשימה מתחלפת בפעולות הבחירה, באותו גובה
-          <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: '#E8EEF6', borderRadius: 12, margin: '-4px 0', padding: '4px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-              <span style={{ fontSize: 17, fontWeight: 600, color: c.primary }}>
-                {picked.size === 1 ? 'נבחר מטופל אחד' : `נבחרו ${picked.size} מטופלים`}
-              </span>
-              <span style={{ fontSize: 14, color: c.ink2 }}>{hint}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>{selectActions}</div>
-          </div>
-        ) : (
+        {(
           <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
@@ -292,7 +274,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: selecting && (!wide || selUi === 'float') ? 120 : 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: selecting ? 120 : 0 }}>
         {patients.map((p) => (
           <Row
             key={p.id}
@@ -321,8 +303,8 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         </div>
       )}
 
-      {/* חלופה ב: פס פעולות צף בתחתית המסך */}
-      {wide && selecting && selUi === 'float' && (
+      {/* פס פעולות צף בתחתית המסך בזמן הבחירה */}
+      {wide && selecting && (
         <div style={{ position: 'fixed', insetInline: 0, bottom: 24, zIndex: 18, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
           <div style={{ pointerEvents: 'auto', background: c.surface, border: `1px solid ${c.line}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(16,22,34,0.18)', padding: '12px 12px 12px 16px', paddingInlineStart: 24, display: 'flex', alignItems: 'center', gap: 24, animation: `rise 320ms ${EASE}` }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
