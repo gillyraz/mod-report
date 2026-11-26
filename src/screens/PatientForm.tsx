@@ -67,7 +67,7 @@ export default function PatientForm({
           <Field label="מספר תיק" value={fileNo} onChange={setFileNo} inputMode="numeric" dirLtr />
           <Field label="מספר הפנייה" value={referralNo} onChange={setReferralNo} inputMode="numeric" dirLtr hint="מתעדכן כשמגיעה התחייבות חדשה" />
         </div>
-        <Field label="סכום למפגש, לפני מע״מ" value={rate} onChange={setRate} inputMode="decimal" suffix="₪" dirLtr hint="כפי שמודפס בעמודת ״סכום לתשלום״ בטופס" />
+        <Field label="סכום למפגש, לפני מע״מ" value={rate} onChange={(v) => setRate(v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} inputMode="decimal" suffix="₪" dirLtr hint="כפי שמודפס בעמודת ״סכום לתשלום״ בטופס" />
         {tried && missing.length > 0 && (
           <p role="alert" style={{ margin: 0, fontSize: 14, color: '#B3261E' }}>
             חסר: {missing.join(', ')}

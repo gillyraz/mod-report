@@ -1,3 +1,4 @@
+import { useNewPatientShortcut } from './parts'
 import { useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import type { Ctx } from '../App'
@@ -9,6 +10,7 @@ import { PageBar } from './parts'
 export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, toast, wide } = ctx
   const [editing, setEditing] = useState<Patient | 'new' | null>(null)
+  useNewPatientShortcut(() => setEditing('new'))
   const [showArchived, setShowArchived] = useState(false)
   const active = data.patients.filter((p) => !p.archived)
   const archived = data.patients.filter((p) => p.archived)

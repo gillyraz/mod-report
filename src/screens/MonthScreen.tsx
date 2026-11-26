@@ -1,3 +1,4 @@
+import { useNewPatientShortcut } from './parts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, CheckCircle2, FileOutput, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, Upload, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
@@ -21,6 +22,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, scans, setScans, month, setMonth, toast, wide, headerH } = ctx
   const entries = data.months[month] ?? {}
   const [adding, setAdding] = useState(false)
+  useNewPatientShortcut(() => setAdding(true))
   const [sort, setSort] = useState<Sort>('added')
   // מצב בחירה להפקת דיווח: מי ייכלל בטבלה
   const [selecting, setSelecting] = useState(false)
@@ -157,15 +159,15 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
   const status = (
     <>
-      <span style={{ whiteSpace: 'nowrap' }}>
-        <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
-          {eligible.length} מתוך {patients.length}
-        </b>{' '}
-        מוכנים לדיווח
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+        <Ring pct={pct} />
+        <span>
+          <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
+            {eligible.length} מתוך {patients.length}
+          </b>{' '}
+          מוכנים לדיווח
+        </span>
       </span>
-      <div style={{ flex: 1, minWidth: 80 }}>
-        <Progress pct={pct} />
-      </div>
       <span style={{ whiteSpace: 'nowrap' }}>
         סה״כ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
       </span>
@@ -237,9 +239,10 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
                 <option value="last">לפי שם משפחה</option>
               </select>}
             </div>
-            <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting}>
+            {!wide && (
+              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting}>
               הוספת מטופל
-            </Button>
+            </Button>)}
           </div>
         )}
         {wide && (
@@ -269,7 +272,12 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             <span>מפגשים חתומים</span>
             <span>ביטולים ללא הודעה</span>
             <span>לכתוב בטופס</span>
-            <span />
+            {/* הכפתור צמוד לטבלה, מעל עמודת הסריקה */}
+            <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting}>
+              הוספת מטופל
+            </Button>
+            </span>
           </div>
         )}
       </div>
@@ -636,10 +644,13 @@ function VatInline({ ctx }: { ctx: Ctx }) {
   )
 }
 
-function Progress({ pct, width }: { pct: number; width?: number }) {
+/** טבעת התקדמות בגודל קבוע, כדי שהפס העליון לא ישנה רוחב */
+function Ring({ pct }: { pct: number }) {
+  const R = 9, L = 2 * Math.PI * R
   return (
-    <div style={{ height: 8, width: width ?? '100%', flex: width ? `0 0 ${width}px` : undefined, background: c.sub, borderRadius: 999, overflow: 'hidden' }} role="progressbar" aria-valuenow={Math.round(pct * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <div style={{ width: `${pct * 100}%`, height: '100%', background: c.ok, borderRadius: 999, transition: `width 480ms ${EASE}` }} />
-    </div>
+    <svg width={24} height={24} viewBox="0 0 24 24" role="progressbar" aria-valuenow={Math.round(pct * 100)} aria-valuemin={0} aria-valuemax={100} style={{ flex: '0 0 24px', transform: 'rotate(-90deg)' }}>
+      <circle cx={12} cy={12} r={R} fill="none" stroke={c.sub} strokeWidth={4} />
+      <circle cx={12} cy={12} r={R} fill="none" stroke={c.ok} strokeWidth={4} strokeLinecap="round" strokeDasharray={L} strokeDashoffset={L * (1 - pct)} style={{ transition: `stroke-dashoffset 480ms ${EASE}` }} />
+    </svg>
   )
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Ctx } from '../App'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -60,4 +60,20 @@ export function PageBar({ ctx, title, lead, middle, actions }: { ctx: Ctx; title
       {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
     </div>
   )
+}
+
+/** ⌘P או Ctrl+P פותח חלון של מטופל חדש, כשאין חלון אחר פתוח */
+export function useNewPatientShortcut(open: () => void) {
+  const ref = useRef(open)
+  ref.current = open
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'p' && e.code !== 'KeyP') return
+      e.preventDefault()
+      if (document.querySelector('[role="dialog"]')) return
+      ref.current()
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [])
 }
