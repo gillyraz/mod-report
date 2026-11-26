@@ -17,14 +17,15 @@ export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: Reac
   )
 }
 
-export function MonthSwitcher({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+export function MonthSwitcher({ month, setMonth, disabled }: { month: string; setMonth: (m: string) => void; disabled?: boolean }) {
+  const why = disabled ? 'אי אפשר להחליף חודש באמצע הבחירה. מסיימים או מבטלים קודם.' : undefined
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: c.surface, border: `1px solid ${c.line}`, borderRadius: 8, height: 40 }}>
-      <Button kind="ghost" title="החודש הקודם" icon={<ChevronRight size={18} />} onClick={() => setMonth(shiftMonth(month, -1))} style={{ height: 38 }} />
+      <Button kind="ghost" title={why ?? 'החודש הקודם'} disabled={disabled} icon={<ChevronRight size={18} />} onClick={() => setMonth(shiftMonth(month, -1))} style={{ height: 38 }} />
       <span style={{ minWidth: 112, textAlign: 'center', fontWeight: 600, fontSize: 15 }} aria-live="polite">
         {monthLabel(month)}
       </span>
-      <Button kind="ghost" title="החודש הבא" icon={<ChevronLeft size={18} />} onClick={() => setMonth(shiftMonth(month, 1))} style={{ height: 38 }} />
+      <Button kind="ghost" title={why ?? 'החודש הבא'} disabled={disabled} icon={<ChevronLeft size={18} />} onClick={() => setMonth(shiftMonth(month, 1))} style={{ height: 38 }} />
     </div>
   )
 }
@@ -63,15 +64,17 @@ export function PageBar({ ctx, title, lead, middle, actions }: { ctx: Ctx; title
 }
 
 /** המקש N (בכל שפת מקלדת) פותח חלון של מטופל חדש, כשלא מקלידים בשדה ואין חלון פתוח */
-export function useNewPatientShortcut(open: () => void) {
+export function useNewPatientShortcut(open: () => void, enabled = true) {
   const ref = useRef(open)
   ref.current = open
+  const allowed = useRef(enabled)
+  allowed.current = enabled
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat || e.code !== 'KeyN') return
       const t = e.target as HTMLElement | null
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
-      if (document.querySelector('[role="dialog"]')) return
+      if (!allowed.current || document.querySelector('[role="dialog"]')) return
       e.preventDefault()
       ref.current()
     }

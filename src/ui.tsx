@@ -199,11 +199,6 @@ export function Badge({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; child
 /** חלון: בדסקטופ במרכז, בנייד כגיליון מלמטה */
 export function Sheet({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const desk = useWide(700)
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
-  }, [onClose])
   // המסך שמאחורי החלון לא נגלל כל עוד החלון פתוח
   useEffect(() => {
     const html = document.documentElement
@@ -221,11 +216,9 @@ export function Sheet({ title, onClose, children, footer, wide }: { title: strin
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(16,22,34,0.42)', display: 'flex', alignItems: desk ? 'center' : 'flex-end', justifyContent: 'center', zIndex: 50, animation: `fade 240ms ${EASE}` }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: c.bg,
           width: desk ? (wide ? 760 : 520) : '100%',
@@ -253,11 +246,21 @@ export function Card({ children, style, ref, id }: { children: ReactNode; style?
   return <div ref={ref} id={id} style={{ background: c.surface, borderRadius: 12, border: `1px solid ${c.line}`, ...style }}>{children}</div>
 }
 
-export function Toast({ text, lift }: { text: string | null; lift?: boolean }) {
-  if (!text) return null
+export function Toast({ t, onDone, lift }: { t: { text: string; action?: { label: string; run: () => void } } | null; onDone: () => void; lift?: boolean }) {
+  if (!t) return null
   return (
     <div role="status" style={{ position: 'fixed', bottom: lift ? 'calc(80px + env(safe-area-inset-bottom))' : 24, insetInline: 0, display: 'flex', justifyContent: 'center', zIndex: 60, pointerEvents: 'none' }}>
-      <div style={{ background: c.ink, color: '#fff', padding: '12px 16px', borderRadius: 8, fontSize: 15, animation: `rise 320ms ${EASE}`, maxWidth: 'calc(100% - 32px)' }}>{text}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: c.ink, color: '#fff', padding: t.action ? '8px 8px 8px 16px' : '12px 16px', paddingInlineStart: 16, borderRadius: 8, fontSize: 15, animation: `rise 320ms ${EASE}`, maxWidth: 'calc(100% - 32px)', pointerEvents: 'auto' }}>
+        <span>{t.text}</span>
+        {t.action && (
+          <button
+            onClick={() => (t.action!.run(), onDone())}
+            style={{ height: 32, padding: '0 12px', border: 'none', borderRadius: 6, background: 'rgba(255,255,255,0.14)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {t.action.label}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

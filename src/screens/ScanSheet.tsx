@@ -16,10 +16,10 @@ export default function ScanSheet({ scan, patient, onReplace, onRemove, onClose 
             פתיחת הקובץ
           </Button>
           <Button icon={<RefreshCw size={18} />} onClick={onReplace}>
-            החלפה
+            החלפת הסריקה
           </Button>
           <Button kind="danger" icon={<Trash2 size={18} />} onClick={onRemove} style={{ marginInlineStart: 'auto' }}>
-            הסרה
+            הסרת הסריקה
           </Button>
         </>
       }

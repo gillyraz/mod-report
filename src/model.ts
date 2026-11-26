@@ -21,7 +21,12 @@ export type Entry = {
   signed: number
   cancelled: number
   scanId?: string
+  // פרטים שנשמרו לחודש הזה, כדי ששינוי מאוחר לא ישנה חודש שכבר דווח
+  rate?: number
+  referralNo?: string
 }
+
+export type Vat = { rate: number; exempt: boolean }
 
 export type Settings = {
   vatRate: number
@@ -45,6 +50,7 @@ export type Data = {
   patients: Patient[]
   months: Record<string, Record<string, Entry>>
   settings: Settings
+  monthVat?: Record<string, Vat> // שיעור המע״מ של כל חודש, כפי שהיה בו
 }
 
 export const defaultSettings: Settings = {
@@ -63,6 +69,7 @@ export async function loadData(): Promise<Data> {
     patients: d?.patients ?? [],
     months: d?.months ?? {},
     settings: { ...defaultSettings, ...(d?.settings ?? {}) },
+    monthVat: d?.monthVat ?? {},
   }
 }
 
@@ -93,11 +100,16 @@ export const shiftMonth = (key: string, delta: number) => {
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
-export function calc(p: Patient, e: Entry | undefined, s: Settings) {
+export const rateOf = (p: Patient, e: Entry | undefined) => e?.rate ?? p.rate
+export const refOf = (p: Patient, e: Entry | undefined) => e?.referralNo ?? p.referralNo
+export const vatOf = (d: Data, month: string): Vat => d.monthVat?.[month] ?? { rate: d.settings.vatRate, exempt: d.settings.vatExempt }
+
+export function calc(p: Patient, e: Entry | undefined, v: Vat) {
   const signed = e?.signed ?? 0
   const cancelled = e?.cancelled ?? 0
-  const base = r2(signed * p.rate + cancelled * p.rate * 0.5)
-  const vat = s.vatExempt ? 0 : r2((base * s.vatRate) / 100)
+  const rate = rateOf(p, e)
+  const base = r2(signed * rate + cancelled * rate * 0.5)
+  const vat = v.exempt ? 0 : r2((base * v.rate) / 100)
   const total = r2(base + vat)
   return { base, vat, total, sessions: signed + cancelled }
 }
@@ -116,3 +128,36 @@ export function statusOf(e: Entry | undefined): Status {
 export const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim()
 export const scanFileName = (p: Patient, month: string) =>
   `${safeName(p.referralNo || p.fileNo)}_${safeName(p.name)}_${month}.pdf`
+
+/**
+ * שינוי מע״מ חל מהחודש שנבחר והלאה.
+ * חודשים קודמים עם נתונים שומרים את השיעור שהיה בהם.
+ */
+export function setVatFrom(d: Data, from: string, v: Vat): Data {
+  const old = { rate: d.settings.vatRate, exempt: d.settings.vatExempt }
+  const monthVat = { ...(d.monthVat ?? {}) }
+  for (const m of Object.keys(d.months)) {
+    if (m < from) monthVat[m] = monthVat[m] ?? old
+    else monthVat[m] = v
+  }
+  monthVat[from] = v
+  return { ...d, monthVat, settings: { ...d.settings, vatRate: v.rate, vatExempt: v.exempt } }
+}
+
+/**
+ * עדכון פרטי מטופל. סכום ומספר הפנייה חדשים חלים מהחודש שנבחר והלאה,
+ * וחודשים קודמים שומרים את מה שהיה בהם.
+ */
+export function updatePatient(d: Data, p: Patient, from: string): Data {
+  const old = d.patients.find((x) => x.id === p.id)
+  const months = { ...d.months }
+  if (old && (old.rate !== p.rate || old.referralNo !== p.referralNo)) {
+    for (const [m, es] of Object.entries(d.months)) {
+      const e = es[p.id]
+      if (!e) continue
+      const next: Entry = m < from ? { ...e, rate: e.rate ?? old.rate, referralNo: e.referralNo ?? old.referralNo } : { signed: e.signed, cancelled: e.cancelled, scanId: e.scanId }
+      months[m] = { ...es, [p.id]: next }
+    }
+  }
+  return { ...d, months, patients: d.patients.map((x) => (x.id === p.id ? p : x)) }
+}

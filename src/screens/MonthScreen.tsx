@@ -1,10 +1,10 @@
 import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, CheckCircle2, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, UserPlus, X } from 'lucide-react'
+import { Check, CheckCircle2, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card, EASE, Stepper } from '../ui'
-import { calc, ils, uid, type Entry, type Patient, type Scan } from '../model'
+import { calc, ils, monthLabel, rateOf, refOf, setVatFrom, uid, vatOf, type Entry, type Patient, type Scan } from '../model'
 import { makeThumb } from '../pdf'
 import AssignSheet from './AssignSheet'
 import ScanSheet from './ScanSheet'
@@ -23,10 +23,11 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const entries = data.months[month] ?? {}
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
-  useNewPatientShortcut(() => setAdding(true))
   const [sort, setSort] = useState<Sort>('added')
+  const [query, setQuery] = useState('')
   // מצב בחירה להפקת דיווח: מי ייכלל בטבלה
   const [selecting, setSelecting] = useState(false)
+  useNewPatientShortcut(() => setAdding(true), !selecting)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [reporting, setReporting] = useState<Patient[] | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -43,11 +44,13 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     if (sort === 'last') return [...list].sort((a, b) => lastName(a.name).localeCompare(lastName(b.name), 'he'))
     return list // סדר ההוספה: מטופל חדש תמיד בסוף
   }, [data.patients, entries, sort])
+  const q = query.trim()
+  const shown = q ? patients.filter((p) => p.name.includes(q) || p.fileNo.includes(q) || refOf(p, entries[p.id]).includes(q)) : patients
   // אפשר להכניס לטבלה רק מטופל שיש לו מפגשים וגם סריקה של הטופס
   const hasScan = (id: string) => scans.some((x) => x.id === entries[id]?.scanId)
   const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id)
   const eligible = patients.filter((p) => canReport(p.id))
-  const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], data.settings).total, 0)
+  const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], vatOf(data, month)).total, 0)
   const pct = patients.length ? eligible.length / patients.length : 0
 
   const setEntry = (pid: string, fn: (e: Entry) => Entry) =>
@@ -69,7 +72,9 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   // שיוך אוטומטי לפי מספר הפנייה, מספר תיק או שם בשם הקובץ
   const guess = (name: string): Patient | undefined => {
     const n = name.replace(/\.[^.]+$/, '')
-    return patients.find((p) => !entries[p.id]?.scanId && ((p.referralNo && n.includes(p.referralNo)) || (p.fileNo && n.includes(p.fileNo)) || n.includes(p.name)))
+    // מספר נחשב רק כשהוא עומד בפני עצמו בשם הקובץ, לא כחלק ממספר ארוך יותר
+    const num = (x: string) => !!x && new RegExp(`(^|\\D)${x}(\\D|$)`).test(n)
+    return patients.find((p) => !entries[p.id]?.scanId && (num(refOf(p, entries[p.id])) || num(p.fileNo) || n.includes(p.name)))
   }
 
   const importFiles = async (files: FileList | File[] | null, forPatient?: string) => {
@@ -138,6 +143,8 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
   const addForm = adding && (
     <PatientForm
+      others={data.patients}
+      month={month}
       onClose={() => setAdding(false)}
       onSave={(p) => {
         setData((d) => ({ ...d, patients: [...d.patients, p] }))
@@ -150,11 +157,12 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
   const importForm = importing && <ImportSheet ctx={ctx} onClose={() => setImporting(false)} />
 
-  if (data.patients.filter((p) => !p.archived).length === 0) {
+  // אין מטופלים להציג בחודש הזה (גם לא מטופל בארכיון שיש לו נתונים בחודש)
+  if (patients.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: wide ? 32 : 0 }}>
         {wide && <PageBar ctx={ctx} title="החודש" />}
-        <Welcome ctx={ctx} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} />
+        <Welcome ctx={ctx} archived={data.patients.filter((p) => p.archived).length} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} />
         {addForm}
         {importForm}
       </div>
@@ -173,7 +181,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         </span>
       </span>
       <span style={{ whiteSpace: 'nowrap' }}>
-        סה״כ <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
+        סה״כ החודש <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</b>
       </span>
       <VatInline ctx={ctx} />
     </>
@@ -198,7 +206,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       <PageBar
         ctx={ctx}
         title="החודש"
-        lead={<MonthSwitcher month={month} setMonth={setMonth} />}
+        lead={<MonthSwitcher month={month} setMonth={setMonth} disabled={selecting} />}
         middle={wide ? status : <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>{status}</div>}
         actions={
           <>
@@ -212,26 +220,39 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         }
       />
 
-      {/* כותרת הרשימה וכותרות העמודות: נשארות במקום, רק השורות נגללות */}
-      <div style={{ position: wide ? 'sticky' : 'static', top: headerH, zIndex: 10, background: c.bg, paddingTop: wide ? 24 : 0, paddingBottom: 8, marginInline: wide ? -8 : 0, paddingInline: wide ? 8 : 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {unassigned.length > 0 && !selecting && (
+      {/* סריקות שממתינות לשיוך: מעל הרשימה, לא נשאר קבוע בגלילה */}
+      {unassigned.length > 0 && !selecting && <div style={{ paddingTop: wide ? 24 : 0 }}>
           <button
             onClick={() => setAssigning(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', background: c.warnBg, color: c.warn, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer', textAlign: 'start' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', width: '100%', background: c.warnBg, color: c.warn, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer', textAlign: 'start' }}
           >
             <FileStack size={20} />
             <span style={{ flex: 1 }}>
               {unassigned.length === 1 ? (<><b>סריקה אחת</b> ממתינה לשיוך למטופל</>) : (<><b>{unassigned.length} סריקות</b> ממתינות לשיוך למטופל</>)}
             </span>
-            <span style={{ fontWeight: 600, textDecoration: 'underline' }}>לשיוך</span>
+            <span style={{ fontWeight: 600, textDecoration: 'underline' }}>{unassigned.length === 1 ? 'שיוך הסריקה' : 'שיוך הסריקות'}</span>
           </button>
-        )}
+      </div>}
+
+      {/* כותרת הרשימה וכותרות העמודות: נשארות במקום, רק השורות נגללות */}
+      <div style={{ position: wide ? 'sticky' : 'static', top: headerH, zIndex: 10, background: c.bg, paddingTop: wide ? 24 : 0, paddingBottom: 8, marginInline: wide ? -8 : 0, paddingInline: wide ? 8 : 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {(
           <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
-                מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {patients.length}</span>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {q ? `${shown.length} מתוך ${patients.length}` : patients.length}</span>
               </h2>
+              <label style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Search size={16} style={{ position: 'absolute', insetInlineStart: 12, color: c.ink3, pointerEvents: 'none' }} />
+                <input
+                  type="search"
+                  aria-label="חיפוש מטופל לפי שם, מספר תיק או מספר הפנייה"
+                  placeholder="חיפוש לפי שם, תיק או הפנייה"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  style={{ width: 264, height: 36, borderRadius: 8, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 12px', paddingInlineStart: 36, fontSize: 14 }}
+                />
+              </label>
               {!wide && <select
                 aria-label="מיון המטופלים"
                 value={sort}
@@ -287,7 +308,13 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: selecting ? 120 : 0 }}>
-        {patients.map((p) => (
+        {q && !shown.length && (
+          <div style={{ padding: 24, background: c.sub, borderRadius: 12, fontSize: 15, color: c.ink2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <span>אין מטופל שמתאים ל״{q}״.</span>
+            <Button kind="ghost" onClick={() => setQuery('')}>ניקוי החיפוש</Button>
+          </div>
+        )}
+        {shown.map((p) => (
           <Row
             key={p.id}
             p={p}
@@ -360,10 +387,17 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             oneInput.current?.click()
           }}
           onRemove={() => {
-            attach(viewScan.patient.id, undefined)
-            setScans((s0) => s0.filter((x) => x.id !== viewScan.scan.id))
+            const { scan, patient } = viewScan
+            attach(patient.id, undefined)
+            setScans((s0) => s0.filter((x) => x.id !== scan.id))
             setViewScan(null)
-            toast('הסריקה הוסרה')
+            toast(`הסריקה של ${patient.name} הוסרה`, {
+              label: 'ביטול ההסרה',
+              run: () => {
+                setScans((s0) => [...s0, scan])
+                setEntry(patient.id, (e) => ({ ...e, scanId: scan.id }))
+              },
+            })
           }}
           onClose={() => setViewScan(null)}
         />
@@ -439,7 +473,7 @@ function Row({
   onEntry: (fn: (e: Entry) => Entry) => void
 }) {
   const { wide, data } = ctx
-  const r = calc(p, e, data.settings)
+  const r = calc(p, e, vatOf(data, ctx.month))
   const has = r.sessions > 0
   const dim = select && !select.can
 
@@ -453,10 +487,11 @@ function Row({
           </Badge>
         )}
         {has && !scan && <Badge tone="warn">חסרה סריקה</Badge>}
+        {!has && scan && <Badge tone="warn">יש סריקה, חסרים מפגשים</Badge>}
         {dim && !has && <span style={{ fontSize: 13, color: c.ink2 }}>אין מפגשים החודש</span>}
       </div>
       <span style={{ fontSize: 13, color: c.ink2, fontVariantNumeric: 'tabular-nums' }}>
-        תיק {p.fileNo} · הפנייה {p.referralNo} · {ils(p.rate)} למפגש
+        תיק {p.fileNo} · הפנייה {refOf(p, e)} · {ils(rateOf(p, e))} למפגש
       </span>
     </div>
   )
@@ -483,7 +518,7 @@ function Row({
     </Button>
   )
 
-  const box = select && <Check4 checked={select.on} disabled={!select.can} label={select.can ? `הכללת ${p.name} בטבלה` : `${p.name}: אין מפגשים החודש`} onChange={select.toggle} />
+  const box = select && <Check4 checked={select.on} disabled={!select.can} label={select.can ? `הכללת ${p.name} בטבלה` : `${p.name}: ${has ? 'חסרה סריקה' : 'אין מפגשים החודש'}`} onChange={select.toggle} />
 
   const cardStyle = {
     opacity: dim ? 0.45 : 1,
@@ -529,7 +564,7 @@ function Num({ label, value, strong }: { label: string; value: string; strong?: 
   )
 }
 
-function Welcome({ ctx, onAdd, onImport }: { ctx: Ctx; onAdd: () => void; onImport: () => void }) {
+function Welcome({ ctx, archived, onAdd, onImport }: { ctx: Ctx; archived: number; onAdd: () => void; onImport: () => void }) {
   const { go } = ctx
   const steps = [
     ['מוסיפים את המטופלים', 'שם, מספר תיק, מספר הפנייה וסכום למפגש. פעם אחת.'],
@@ -546,6 +581,14 @@ function Welcome({ ctx, onAdd, onImport }: { ctx: Ctx; onAdd: () => void; onImpo
         <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>דיווח חודשי למשרד הביטחון, בלי טבלאות ביד</h1>
         <p style={{ margin: 0, fontSize: 16, color: c.ink2, lineHeight: 1.6 }}>חישוב מע״מ וסה״כ לכל טופס, טבלה חודשית מוכנה, וקבצים מסודרים להעלאה.</p>
       </div>
+      {archived > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 16px', background: c.warnBg, color: c.warn, borderRadius: 12, fontSize: 15 }}>
+          <span>{archived === 1 ? 'המטופל היחיד נמצא בארכיון.' : `כל ${archived} המטופלים נמצאים בארכיון.`} אפשר להחזיר אותם לרשימה בעמוד המטופלים.</span>
+          <Button kind="ghost" onClick={() => go('patients')} style={{ color: c.warn, fontWeight: 600 }}>
+            מעבר לעמוד המטופלים
+          </Button>
+        </div>
+      )}
       <Card style={{ padding: 8, background: c.sub, border: 'none' }}>
         {steps.map(([t, d], i) => (
           <div key={t} style={{ display: 'flex', gap: 16, padding: 16, background: c.surface, borderRadius: 8, marginTop: i ? 8 : 0 }}>
@@ -588,17 +631,18 @@ function Welcome({ ctx, onAdd, onImport }: { ctx: Ctx; onAdd: () => void; onImpo
 
 /** שיעור המע״מ משתנה מעת לעת, ולכן אפשר לעדכן אותו ישירות מכאן */
 function VatInline({ ctx }: { ctx: Ctx }) {
-  const { data, setData, toast } = ctx
-  const s = data.settings
+  const { data, setData, toast, month } = ctx
+  const v = vatOf(data, month)
+  const s = { vatRate: v.rate, vatExempt: v.exempt }
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(String(s.vatRate))
   if (s.vatExempt) return <span>עוסק פטור, בלי מע״מ</span>
   const save = () => {
     const n = parseFloat(val)
     if (!Number.isFinite(n) || n < 0 || n > 100) return toast('שיעור מע״מ צריך להיות מספר בין 0 ל-100')
-    setData((d) => ({ ...d, settings: { ...d.settings, vatRate: n } }))
+    setData((d) => setVatFrom(d, month, { rate: n, exempt: false }))
     setEditing(false)
-    toast(`שיעור המע״מ עודכן ל-${n}%. כל הסכומים חושבו מחדש.`)
+    toast(`המע״מ עודכן ל-${n}% מ${monthLabel(month)} והלאה. החודשים הקודמים לא השתנו.`)
   }
   if (!editing)
     return (

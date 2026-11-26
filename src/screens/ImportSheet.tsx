@@ -44,6 +44,18 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
     downloadFiles([await templateFile()])
   }
   const pick = () => input.current?.click()
+  // אחרי שנבחר קובץ, השורה הזו תמיד מופיעה: גם בתצוגה המקדימה וגם כשיש שגיאה
+  const fileRow = file && (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.ink2, minWidth: 0 }}>
+        <FileSpreadsheet size={18} style={{ flex: '0 0 18px' }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file}</span>
+      </span>
+      <Button kind="ghost" icon={<RefreshCw size={16} />} onClick={pick} disabled={busy}>
+        {busy ? 'קורא את הקובץ…' : 'בחירת קובץ אחר'}
+      </Button>
+    </div>
+  )
 
   return (
     <Sheet
@@ -56,7 +68,7 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
             <Button kind="primary" onClick={save} disabled={!good.length}>
               {good.length === 1 ? 'הוספת מטופל אחד' : `הוספת ${good.length} מטופלים`}
             </Button>
-          ) : (
+          ) : file ? null : (
             <Button kind="primary" icon={<FileSpreadsheet size={18} />} onClick={pick} disabled={busy}>
               {busy ? 'קורא את הקובץ…' : 'בחירת קובץ'}
             </Button>
@@ -75,8 +87,9 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
             קובץ אקסל (‎.xlsx) או CSV, עם שורת כותרות ומתחתיה מטופל אחד בכל שורה. הכלי מזהה את העמודות לפי הכותרות, בכל סדר.
           </p>
 
+          {fileRow}
           {/* אזור ההעלאה: לחיצה או גרירת קובץ */}
-          <button
+          {!file && <button
             onClick={pick}
             onDragOver={(e) => (e.preventDefault(), setOver(true))}
             onDragLeave={() => setOver(false)}
@@ -99,14 +112,12 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
               <FileSpreadsheet size={18} />
               גוררים לכאן את הקובץ, או לוחצים לבחירה
             </span>
-          </button>
+          </button>}
 
           {error && (
             <div role="alert" style={{ display: 'flex', gap: 8, padding: '12px 16px', background: c.dangerBg, color: c.danger, borderRadius: 12, fontSize: 14, lineHeight: 1.5 }}>
               <AlertCircle size={18} style={{ flex: '0 0 18px', marginTop: 1 }} />
-              <span>
-                <b>{file}:</b> {error}
-              </span>
+              <span>{error}</span>
             </div>
           )}
 
@@ -116,15 +127,7 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.ink2, minWidth: 0 }}>
-              <FileSpreadsheet size={18} style={{ flex: '0 0 18px' }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file}</span>
-            </span>
-            <Button kind="ghost" icon={<RefreshCw size={16} />} onClick={pick}>
-              בחירת קובץ אחר
-            </Button>
-          </div>
+          {fileRow}
 
           {bad.length > 0 && (
             <Group tone="warn" title={bad.length === 1 ? 'שורה אחת לא תיכנס' : `${bad.length} שורות לא ייכנסו`} rows={bad} />

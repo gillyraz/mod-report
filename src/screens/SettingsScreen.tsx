@@ -2,22 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, Card, Field } from '../ui'
-import { defaultSettings, wipeAll, type Settings } from '../model'
+import { defaultSettings, monthLabel, setVatFrom, vatOf, wipeAll, type Data, type Settings } from '../model'
 import { backupFile, readBackup } from '../backup'
 import { downloadFiles } from '../files'
 import { PageBar } from './parts'
 import { PROTO } from '../proto'
 
 export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
-  const { data, setData, setScans, toast } = ctx
+  const { data, setData, setScans, toast, month } = ctx
   const s = data.settings
+  const mv = vatOf(data, month)
+  const [pending, setPending] = useState<Data | null>(null)
   const fileIn = useRef<HTMLInputElement>(null)
   const [confirmWipe, setConfirmWipe] = useState(false)
-  const [vatText, setVatText] = useState(String(s.vatRate))
+  const [vatText, setVatText] = useState(String(mv.rate))
   useEffect(() => {
-    if ((parseFloat(vatText) || 0) !== s.vatRate) setVatText(String(s.vatRate))
+    if (parseFloat(vatText) !== mv.rate) setVatText(String(mv.rate))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.vatRate])
+  }, [mv.rate])
+  const vatNum = parseFloat(vatText)
+  const vatBad = vatText.trim() === '' || !Number.isFinite(vatNum) || vatNum > 100
+  // שיעור המע״מ חל מהחודש שנבחר והלאה, כמו בעריכה בעמוד החודש
+  const onVat = (v: string) => {
+    const t = v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1')
+    setVatText(t)
+    const n = parseFloat(t)
+    if (t.trim() !== '' && Number.isFinite(n) && n <= 100) setData((d) => setVatFrom(d, month, { rate: n, exempt: vatOf(d, month).exempt }))
+  }
   const set = (patch: Partial<Settings>) => setData((d) => ({ ...d, settings: { ...d.settings, ...patch } }))
 
   const backup = () => {
@@ -28,7 +39,13 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
     if (!f) return
     const d = await readBackup(f)
     if (!d) return toast('הקובץ הזה אינו קובץ גיבוי של הכלי')
+    if (!data.patients.length) return apply(d)
+    setPending(d) // יש מידע קיים: מבקשים אישור לפני שמחליפים אותו
+  }
+  const apply = (d: Data) => {
+    setScans(() => [])
     setData(() => d)
+    setPending(null)
     toast(`שוחזרו ${d.patients.length} מטופלים`)
   }
 
@@ -37,8 +54,13 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
       <PageBar ctx={ctx} title="הגדרות" middle={<span>שינויים נשמרים אוטומטית.</span>} />
 
       <Section title="חישוב">
-        <Field label="שיעור מע״מ" value={vatText} onChange={(v) => (setVatText(v), set({ vatRate: Math.max(0, parseFloat(v) || 0) }))} inputMode="decimal" suffix="%" dirLtr />
-        <Toggle label="עוסק פטור (בלי מע״מ)" checked={s.vatExempt} onChange={(v) => set({ vatExempt: v })} />
+        <Field label="שיעור מע״מ" value={vatText} onChange={onVat} inputMode="decimal" suffix="%" dirLtr hint={`חל מ${monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.`} />
+        {vatBad && (
+          <p role="alert" style={{ margin: '-8px 0 0', fontSize: 14, color: c.danger }}>
+            שיעור מע״מ צריך להיות מספר בין 0 ל-100. נשמר השיעור הקודם, {mv.rate}%.
+          </p>
+        )}
+        <Toggle label="עוסק פטור (בלי מע״מ)" checked={mv.exempt} onChange={(v) => setData((d) => setVatFrom(d, month, { rate: vatOf(d, month).rate, exempt: v }))} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 500 }}>הסכום שמופיע בטבלה החודשית</span>
           <div role="radiogroup" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -78,6 +100,21 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
             שחזור מקובץ
           </Button>
         </div>
+        {pending && (
+          <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.warnBg, borderRadius: 8 }}>
+            <span style={{ color: c.warn, fontSize: 15, lineHeight: 1.6 }}>
+              השחזור יחליף את {data.patients.length} המטופלים והסכומים שיש עכשיו במכשיר ב-{pending.patients.length} המטופלים מהקובץ. הסריקות שצורפו יוסרו, כי הן לא נשמרות בגיבוי.
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button kind="primary" onClick={() => apply(pending)}>
+                החלפת המידע במידע מהקובץ
+              </Button>
+              <Button kind="ghost" onClick={() => setPending(null)}>
+                ביטול
+              </Button>
+            </div>
+          </div>
+        )}
         <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => (restore(e.target.files?.[0]), (e.target.value = ''))} />
       </Section>
 

@@ -4,12 +4,12 @@ import { useState } from 'react'
 import { FileSpreadsheet, UserPlus } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card } from '../ui'
-import { ils, type Patient } from '../model'
+import { ils, updatePatient, type Patient } from '../model'
 import PatientForm from './PatientForm'
 import { PageBar } from './parts'
 
 export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
-  const { data, setData, toast, wide } = ctx
+  const { data, setData, toast, wide, month } = ctx
   const [editing, setEditing] = useState<Patient | 'new' | null>(null)
   useNewPatientShortcut(() => setEditing('new'))
   const [importing, setImporting] = useState(false)
@@ -19,7 +19,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   const list = showArchived ? archived : active
 
   const save = (p: Patient) => {
-    setData((d) => ({ ...d, patients: d.patients.some((x) => x.id === p.id) ? d.patients.map((x) => (x.id === p.id ? p : x)) : [...d.patients, p] }))
+    setData((d) => (d.patients.some((x) => x.id === p.id) ? updatePatient(d, p, month) : { ...d, patients: [...d.patients, p] }))
     toast(editing === 'new' ? `${p.name} נוסף לרשימה` : 'השינויים נשמרו')
     setEditing(null)
   }
@@ -123,7 +123,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
       )}
 
       {importing && <ImportSheet ctx={ctx} onClose={() => setImporting(false)} />}
-      {editing && <PatientForm patient={editing === 'new' ? undefined : editing} onSave={save} onClose={() => setEditing(null)} onArchive={archive} />}
+      {editing && <PatientForm others={data.patients} month={month} patient={editing === 'new' ? undefined : editing} onSave={save} onClose={() => setEditing(null)} onArchive={archive} />}
     </div>
   )
 }

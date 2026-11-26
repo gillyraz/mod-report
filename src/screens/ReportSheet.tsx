@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Share2 } from 'lucide-react'
+import { CheckCircle2, Download, Share2 } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, Sheet } from '../ui'
-import { calc, ils, monthLabel, type Patient } from '../model'
+import { calc, ils, monthLabel, refOf, vatOf, type Patient } from '../model'
 import { elementToPdf } from '../pdf'
 import { canShareFiles, downloadFiles, pdfFile, shareFiles } from '../files'
 import { PROTO } from '../proto'
@@ -12,6 +12,7 @@ const MAX = 20
 /** הפקת הדיווח: רק המטופלים שסומנו, וקובץ אחד בלבד, הטבלה החודשית */
 export default function ReportSheet({ ctx, list, onClose, onDone }: { ctx: Ctx; list: Patient[]; onClose: () => void; onDone: () => void }) {
   const { month } = ctx
+  const [saved, setSaved] = useState<Set<number>>(new Set())
   const batches: Patient[][] = []
   for (let i = 0; i < list.length; i += MAX) batches.push(list.slice(i, i + MAX))
 
@@ -23,20 +24,33 @@ export default function ReportSheet({ ctx, list, onClose, onDone }: { ctx: Ctx; 
           : 'שומרים את הטבלה ומעלים אותה לאתר המשרד, יחד עם הטפסים הסרוקים מה-Drive.'}
       </p>
       {batches.map((b, i) => (
-        <Batch key={i} ctx={ctx} list={b} index={i} count={batches.length} onSaved={batches.length === 1 ? onDone : undefined} />
+        <Batch
+          key={i}
+          ctx={ctx}
+          list={b}
+          index={i}
+          count={batches.length}
+          saved={saved.has(i)}
+          onSaved={() => {
+            const n = new Set(saved).add(i)
+            setSaved(n)
+            // כשכל הטבלאות נשמרו, יוצאים ממצב הבחירה
+            if (n.size === batches.length) onDone()
+          }}
+        />
       ))}
     </Sheet>
   )
 }
 
-function Batch({ ctx, list, index, count, onSaved }: { ctx: Ctx; list: Patient[]; index: number; count: number; onSaved?: () => void }) {
+function Batch({ ctx, list, index, count, saved, onSaved }: { ctx: Ctx; list: Patient[]; index: number; count: number; saved: boolean; onSaved: () => void }) {
   const { data, month, wide, toast } = ctx
   const ref = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
   const s = data.settings
   const entries = data.months[month] ?? {}
   const amount = (p: Patient) => {
-    const r = calc(p, entries[p.id], s)
+    const r = calc(p, entries[p.id], vatOf(data, month))
     return s.tableAmount === 'total' ? r.total : r.base
   }
   const sum = list.reduce((a, p) => a + amount(p), 0)
@@ -45,7 +59,10 @@ function Batch({ ctx, list, index, count, onSaved }: { ctx: Ctx; list: Patient[]
   const share = !wide && canShareFiles([new File([], 'x.pdf', { type: 'application/pdf' })])
 
   const save = async () => {
-    if (PROTO) return toast('בגרסה האמיתית הטבלה נשמרת עכשיו כקובץ PDF. בפרוטוטייפ אין שמירה.')
+    if (PROTO) {
+      toast('בגרסה האמיתית הטבלה נשמרת עכשיו כקובץ PDF. בפרוטוטייפ אין שמירה.')
+      return onSaved()
+    }
     setBusy(true)
     try {
       const f = pdfFile(await elementToPdf(ref.current!), tableName)
@@ -54,25 +71,32 @@ function Batch({ ctx, list, index, count, onSaved }: { ctx: Ctx; list: Patient[]
         await downloadFiles([f])
         toast('הטבלה נשמרה בתיקיית ההורדות')
       }
-      onSaved?.()
+      onSaved()
     } catch (err) {
       if ((err as Error)?.name !== 'AbortError') toast('השמירה לא הצליחה. נסו שוב.')
     }
     setBusy(false)
   }
 
-  const label = count > 1 ? `שמירת טבלה ${index + 1} מתוך ${count}` : 'שמירת הטבלה החודשית'
+  const label = saved ? (count > 1 ? `שמירה חוזרת של טבלה ${index + 1}` : 'שמירה חוזרת של הטבלה') : count > 1 ? `שמירת טבלה ${index + 1} מתוך ${count}` : 'שמירת הטבלה החודשית'
 
   return (
     <div style={{ background: c.surface, borderRadius: 12, overflow: 'hidden', border: `1px solid ${c.line}` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: 16, flexWrap: 'wrap', borderBottom: `1px solid ${c.line}` }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontWeight: 600 }}>{count > 1 ? `טבלה ${index + 1} מתוך ${count}` : 'הטבלה החודשית'}</span>
+          <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {count > 1 ? `טבלה ${index + 1} מתוך ${count}` : 'הטבלה החודשית'}
+            {saved && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 8px', borderRadius: 999, background: c.okBg, color: c.ok, fontSize: 13, fontWeight: 500 }}>
+                <CheckCircle2 size={14} /> נשמרה
+              </span>
+            )}
+          </span>
           <span style={{ fontSize: 14, color: c.ink2 }}>
             {list.length === 1 ? 'מטופל אחד' : `${list.length} מטופלים`} · קובץ PDF בשם <bdi dir="ltr">{tableName.replace(/_/g, '‎_‎')}</bdi>
           </span>
         </div>
-        <Button kind="primary" icon={share ? <Share2 size={18} /> : <Download size={18} />} onClick={save} disabled={busy}>
+        <Button kind={saved ? undefined : 'primary'} icon={share ? <Share2 size={18} /> : <Download size={18} />} onClick={save} disabled={busy}>
           {busy ? 'מכין את הקובץ…' : label}
         </Button>
       </div>
@@ -107,7 +131,7 @@ function Batch({ ctx, list, index, count, onSaved }: { ctx: Ctx; list: Patient[]
                   <td style={td}>{i + 1}</td>
                   <td style={td}>{p.name}</td>
                   <td style={td}>{p.fileNo}</td>
-                  <td style={td}>{p.referralNo}</td>
+                  <td style={td}>{refOf(p, entries[p.id])}</td>
                   <td style={td}>{ils(amount(p))}</td>
                 </tr>
               ))}

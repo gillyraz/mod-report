@@ -17,7 +17,7 @@ export type Ctx = {
   setScans: (fn: (s: Scan[]) => Scan[]) => void
   month: string
   setMonth: (m: string) => void
-  toast: (t: string) => void
+  toast: (t: string, action?: ToastAction) => void
   go: (t: Tab) => void
   wide: boolean
   /** בדסקטופ: המקום בפס העליון שבו כל עמוד מציג את הכותרת והפעולות שלו */
@@ -25,12 +25,14 @@ export type Ctx = {
   headerH: number
 }
 
+export type ToastAction = { label: string; run: () => void }
+
 export default function App() {
   const [data, setDataRaw] = useState<Data | null>(null)
   const [scans, setScansRaw] = useState<Scan[]>([])
   const [tab, setTab] = useState<Tab>('month')
   const [month, setMonth] = useState(() => monthKey(new Date()))
-  const [toastText, setToastText] = useState<string | null>(null)
+  const [toastText, setToastText] = useState<{ text: string; action?: ToastAction } | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const wide = useWide()
   const [pageEl, setPageEl] = useState<HTMLElement | null>(null)
@@ -65,10 +67,11 @@ export default function App() {
       return n
     })
   }, [])
-  const toast = useCallback((t: string) => {
-    setToastText(t)
+  const toast = useCallback((t: string, action?: ToastAction) => {
+    setToastText({ text: t, action })
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setToastText(null), 2800)
+    // הודעה עם פעולה נשארת יותר זמן, כדי שיהיה זמן ללחוץ
+    timer.current = window.setTimeout(() => setToastText(null), action ? 6000 : 2800)
   }, [])
 
   if (!data) return null
@@ -119,7 +122,7 @@ export default function App() {
           <div ref={setPageEl} />
         </header>
         <main style={{ flex: 1, width: '100%', maxWidth: 1184, margin: '0 auto', padding: '0 32px 48px' }}>{screen}</main>
-        <Toast text={toastText} />
+        <Toast t={toastText} onDone={() => setToastText(null)} />
       </div>
     )
 
@@ -153,7 +156,7 @@ export default function App() {
           )
         })}
       </nav>
-      <Toast text={toastText} lift />
+      <Toast t={toastText} onDone={() => setToastText(null)} lift />
     </div>
   )
 }

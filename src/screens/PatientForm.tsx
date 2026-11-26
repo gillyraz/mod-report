@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { Archive, ArchiveRestore, CalendarPlus } from 'lucide-react'
 import { Button, c, Field, Sheet } from '../ui'
-import { uid, type Patient } from '../model'
+import { monthLabel, uid, type Patient } from '../model'
 
 export default function PatientForm({
   patient,
   onSave,
   onClose,
   onArchive,
+  others,
+  month,
 }: {
+  others: Patient[]
+  month: string
   patient?: Patient
   onSave: (p: Patient) => void
   onClose: () => void
@@ -21,11 +25,14 @@ export default function PatientForm({
   const [tried, setTried] = useState(false)
 
   const rateNum = parseFloat(rate.replace(/[^\d.]/g, ''))
+  const digits = (v: string) => v.replace(/\D/g, '')
+  const dup = fileNo.trim() ? others.find((o) => o.id !== patient?.id && o.fileNo.trim() === fileNo.trim()) : undefined
+  const changed = !!patient && ((rateNum > 0 && rateNum !== patient.rate) || referralNo.trim() !== patient.referralNo)
   const missing = [!name.trim() && 'שם', !fileNo.trim() && 'מספר תיק', !referralNo.trim() && 'מספר הפנייה', !(rateNum > 0) && 'סכום למפגש'].filter(Boolean) as string[]
 
   const submit = () => {
     setTried(true)
-    if (missing.length) return
+    if (missing.length || dup) return
     onSave({ id: patient?.id ?? uid(), name: name.trim(), fileNo: fileNo.trim(), referralNo: referralNo.trim(), rate: rateNum, archived: patient?.archived, addedAt: patient?.addedAt ?? Date.now() })
   }
 
@@ -64,10 +71,21 @@ export default function PatientForm({
         )}
         <Field label="שם המטופל" value={name} onChange={setName} autoFocus={!patient} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
-          <Field label="מספר תיק" value={fileNo} onChange={setFileNo} inputMode="numeric" dirLtr />
-          <Field label="מספר הפנייה" value={referralNo} onChange={setReferralNo} inputMode="numeric" dirLtr hint="מתעדכן כשמגיעה התחייבות חדשה" />
+          <Field label="מספר תיק" value={fileNo} onChange={(v) => setFileNo(digits(v))} inputMode="numeric" dirLtr />
+          <Field label="מספר הפנייה" value={referralNo} onChange={(v) => setReferralNo(digits(v))} inputMode="numeric" dirLtr hint="מתעדכן כשמגיעה התחייבות חדשה" />
         </div>
+        {dup && (
+          <p role="alert" style={{ margin: 0, fontSize: 14, color: c.danger }}>
+            מספר התיק {fileNo} כבר שייך ל{dup.name}{dup.archived ? ' (בארכיון)' : ''}. אי אפשר להוסיף את אותו מטופל פעמיים.
+          </p>
+        )}
         <Field label="סכום למפגש, לפני מע״מ" value={rate} onChange={(v) => setRate(v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} inputMode="decimal" suffix="₪" dirLtr hint="כפי שמודפס בעמודת ״סכום לתשלום״ בטופס" />
+        {changed && (
+          <div style={{ display: 'flex', gap: 8, padding: '12px 16px', background: c.sub, borderRadius: 8, fontSize: 14, color: c.ink2, lineHeight: 1.5 }}>
+            <CalendarPlus size={16} style={{ flex: '0 0 16px', marginTop: 2 }} />
+            <span>השינוי בסכום או במספר ההפנייה חל מ{monthLabel(month)} והלאה. החודשים הקודמים נשארים כמו שדווחו.</span>
+          </div>
+        )}
         {tried && missing.length > 0 && (
           <p role="alert" style={{ margin: 0, fontSize: 14, color: '#B3261E' }}>
             חסר: {missing.join(', ')}
