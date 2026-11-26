@@ -1,7 +1,7 @@
 import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, CheckCircle2, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, UserPlus, X } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card, EASE, Stepper } from '../ui'
 import { calc, ils, monthLabel, rateOf, refOf, setVatFrom, uid, vatOf, type Entry, type Patient, type Scan } from '../model'
@@ -52,6 +52,14 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const eligible = patients.filter((p) => canReport(p.id))
   const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], vatOf(data, month)).total, 0)
   const pct = patients.length ? eligible.length / patients.length : 0
+  // הטבלה של החודש: מתי נשמרה, ואם הנתונים השתנו מאז
+  const sumOf = (ids: string[]) => ids.reduce((a, id) => {
+    const p = data.patients.find((x) => x.id === id)
+    return p ? a + calc(p, entries[id], vatOf(data, month)).total : a
+  }, 0)
+  const rep = data.reports?.[month]
+  const repChanged = !!rep && (Math.abs(sumOf(rep.ids) - rep.total) > 0.005 || rep.ids.some((id) => !canReport(id)))
+  const notIn = rep ? eligible.filter((p) => !rep.ids.includes(p.id)).length : 0
 
   const setEntry = (pid: string, fn: (e: Entry) => Entry) =>
     setData((d) => {
@@ -128,8 +136,8 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, scans, selecting])
 
-  const startSelect = () => {
-    setPicked(new Set(eligible.map((p) => p.id)))
+  const startSelect = (only?: string[]) => {
+    setPicked(new Set(eligible.map((p) => p.id).filter((id) => !only || only.includes(id))))
     setSelecting(true)
   }
   const toggle = (id: string) =>
@@ -213,7 +221,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             <Button icon={<FileUp size={18} />} onClick={() => bulkInput.current?.click()} disabled={busy || selecting} style={{ flex: wide ? undefined : 1 }}>
               {busy ? 'קורא קבצים…' : 'ייבוא סריקות'}
             </Button>
-            <Button kind="primary" icon={<FileOutput size={18} />} onClick={startSelect} disabled={!eligible.length || selecting} title={!eligible.length ? 'אין עדיין מטופל עם מפגשים וסריקה' : undefined} style={{ flex: wide ? undefined : 1 }}>
+            <Button kind="primary" icon={<FileOutput size={18} />} onClick={() => startSelect()} disabled={!eligible.length || selecting} title={!eligible.length ? 'אין עדיין מטופל עם מפגשים וסריקה' : undefined} style={{ flex: wide ? undefined : 1 }}>
               הפקת דיווח
             </Button>
           </>
@@ -221,7 +229,24 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       />
 
       {/* סריקות שממתינות לשיוך: מעל הרשימה, לא נשאר קבוע בגלילה */}
-      {unassigned.length > 0 && !selecting && <div style={{ paddingTop: wide ? 24 : 0 }}>
+      {((rep && !selecting) || (unassigned.length > 0 && !selecting)) && <div style={{ paddingTop: wide ? 24 : 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rep && (
+            <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '8px 8px 8px 16px', paddingInlineStart: 16, background: repChanged ? c.warnBg : c.okBg, color: repChanged ? c.warn : c.ok, borderRadius: 12, fontSize: 15 }}>
+              {repChanged ? <AlertTriangle size={20} style={{ flex: '0 0 20px' }} /> : <CheckCircle2 size={20} style={{ flex: '0 0 20px' }} />}
+              <span style={{ flex: 1, lineHeight: 1.5 }}>
+                <b>הטבלה של {monthLabel(month)} נשמרה ב-{new Date(rep.at).toLocaleDateString('he-IL')}</b>
+                {' · '}
+                {rep.ids.length === 1 ? 'מטופל אחד' : `${rep.ids.length} מטופלים`}, {ils(rep.total)}
+                {repChanged ? '. הנתונים השתנו מאז, וכדאי להפיק אותה מחדש.' : notIn > 0 ? `. ${notIn === 1 ? 'מטופל מוכן אחד לא נכלל' : `${notIn} מטופלים מוכנים לא נכללו`} בה.` : ''}
+              </span>
+              {eligible.length > 0 && (
+                <Button kind="ghost" icon={<FileOutput size={18} />} onClick={() => startSelect(repChanged || !notIn ? rep.ids : undefined)} style={{ color: 'inherit', fontWeight: 600 }}>
+                  הפקה מחדש של הטבלה
+                </Button>
+              )}
+            </div>
+          )}
+          {unassigned.length > 0 && !selecting && (<>
           <button
             onClick={() => setAssigning(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', width: '100%', background: c.warnBg, color: c.warn, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer', textAlign: 'start' }}
@@ -231,7 +256,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
               {unassigned.length === 1 ? (<><b>סריקה אחת</b> ממתינה לשיוך למטופל</>) : (<><b>{unassigned.length} סריקות</b> ממתינות לשיוך למטופל</>)}
             </span>
             <span style={{ fontWeight: 600, textDecoration: 'underline' }}>{unassigned.length === 1 ? 'שיוך הסריקה' : 'שיוך הסריקות'}</span>
-          </button>
+          </button></>)}
       </div>}
 
       {/* כותרת הרשימה וכותרות העמודות: נשארות במקום, רק השורות נגללות */}
@@ -408,6 +433,8 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
           list={reporting}
           onClose={() => setReporting(null)}
           onDone={() => {
+            const ids = reporting.map((p) => p.id)
+            setData((d) => ({ ...d, reports: { ...(d.reports ?? {}), [month]: { at: Date.now(), ids, total: Math.round(sumOf(ids) * 100) / 100 } } }))
             setReporting(null)
             setSelecting(false)
           }}

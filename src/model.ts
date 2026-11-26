@@ -51,7 +51,10 @@ export type Data = {
   months: Record<string, Record<string, Entry>>
   settings: Settings
   monthVat?: Record<string, Vat> // שיעור המע״מ של כל חודש, כפי שהיה בו
+  reports?: Record<string, Report> // מתי נשמרה הטבלה של כל חודש, ועל מי
 }
+
+export type Report = { at: number; ids: string[]; total: number }
 
 export const defaultSettings: Settings = {
   vatRate: 18,
@@ -70,6 +73,7 @@ export async function loadData(): Promise<Data> {
     months: d?.months ?? {},
     settings: { ...defaultSettings, ...(d?.settings ?? {}) },
     monthVat: d?.monthVat ?? {},
+    reports: d?.reports ?? {},
   }
 }
 

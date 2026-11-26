@@ -12,7 +12,7 @@ export async function readBackup(f: File): Promise<Data | undefined> {
   try {
     const j = JSON.parse(await f.text()) as { app?: string; data?: Data }
     if (j.app !== 'mod-report' || !j.data?.patients) return undefined
-    return { patients: j.data.patients, months: j.data.months ?? {}, settings: { ...defaultSettings, ...j.data.settings }, monthVat: j.data.monthVat ?? {} }
+    return { patients: j.data.patients, months: j.data.months ?? {}, settings: { ...defaultSettings, ...j.data.settings }, monthVat: j.data.monthVat ?? {}, reports: j.data.reports ?? {} }
   } catch {
     return undefined
   }
