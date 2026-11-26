@@ -1,6 +1,7 @@
+import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
 import { useState } from 'react'
-import { UserPlus } from 'lucide-react'
+import { FileSpreadsheet, UserPlus } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card } from '../ui'
 import { ils, type Patient } from '../model'
@@ -11,6 +12,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, toast, wide } = ctx
   const [editing, setEditing] = useState<Patient | 'new' | null>(null)
   useNewPatientShortcut(() => setEditing('new'))
+  const [importing, setImporting] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const active = data.patients.filter((p) => !p.archived)
   const archived = data.patients.filter((p) => p.archived)
@@ -34,9 +36,14 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
         title="מטופלים"
         middle={<span>הפרטים מוזנים פעם אחת ומשמשים לכל חודש.</span>}
         actions={
+          <>
+          <Button icon={<FileSpreadsheet size={18} />} onClick={() => setImporting(true)}>
+            ייבוא מאקסל
+          </Button>
           <Button kind="primary" icon={<UserPlus size={18} />} onClick={() => setEditing('new')} title="קיצור מקלדת: N" aria-keyshortcuts="N">
             הוספת מטופל
           </Button>
+          </>
         }
       />
 
@@ -115,6 +122,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
         </Card>
       )}
 
+      {importing && <ImportSheet ctx={ctx} onClose={() => setImporting(false)} />}
       {editing && <PatientForm patient={editing === 'new' ? undefined : editing} onSave={save} onClose={() => setEditing(null)} onArchive={archive} />}
     </div>
   )

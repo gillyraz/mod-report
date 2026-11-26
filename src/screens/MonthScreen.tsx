@@ -1,13 +1,13 @@
+import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, CheckCircle2, FileOutput, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, Upload, UserPlus, X } from 'lucide-react'
+import { Check, CheckCircle2, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, ShieldCheck, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card, EASE, Stepper } from '../ui'
 import { calc, ils, uid, type Entry, type Patient, type Scan } from '../model'
 import { makeThumb } from '../pdf'
 import AssignSheet from './AssignSheet'
 import ScanSheet from './ScanSheet'
-import { readBackup } from '../backup'
 import { MonthSwitcher, PageBar } from './parts'
 import PatientForm from './PatientForm'
 import ReportSheet from './ReportSheet'
@@ -22,6 +22,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, scans, setScans, month, setMonth, toast, wide, headerH } = ctx
   const entries = data.months[month] ?? {}
   const [adding, setAdding] = useState(false)
+  const [importing, setImporting] = useState(false)
   useNewPatientShortcut(() => setAdding(true))
   const [sort, setSort] = useState<Sort>('added')
   // מצב בחירה להפקת דיווח: מי ייכלל בטבלה
@@ -147,12 +148,15 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     />
   )
 
+  const importForm = importing && <ImportSheet ctx={ctx} onClose={() => setImporting(false)} />
+
   if (data.patients.filter((p) => !p.archived).length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: wide ? 32 : 0 }}>
         {wide && <PageBar ctx={ctx} title="החודש" />}
-        <Welcome ctx={ctx} onAdd={() => setAdding(true)} />
+        <Welcome ctx={ctx} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} />
         {addForm}
+        {importForm}
       </div>
     )
   }
@@ -328,6 +332,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       <input ref={oneInput} type="file" accept={ACCEPT} hidden onChange={(e) => (importFiles(e.target.files, target.current ?? undefined), (e.target.value = ''))} />
 
       {addForm}
+        {importForm}
       {assigning && (
         <AssignSheet
           scans={unassigned}
@@ -524,23 +529,15 @@ function Num({ label, value, strong }: { label: string; value: string; strong?: 
   )
 }
 
-function Welcome({ ctx, onAdd }: { ctx: Ctx; onAdd: () => void }) {
-  const { setData, toast, go } = ctx
-  const fileIn = useRef<HTMLInputElement>(null)
+function Welcome({ ctx, onAdd, onImport }: { ctx: Ctx; onAdd: () => void; onImport: () => void }) {
+  const { go } = ctx
   const steps = [
     ['מוסיפים את המטופלים', 'שם, מספר תיק, מספר הפנייה וסכום למפגש. פעם אחת.'],
     ['מסכמים כל טופס', 'מזינים כמה מפגשים נחתמו, ומעתיקים לטופס את המע״מ והסה״כ.'],
     ['מצרפים סריקות ומפיקים', 'הטבלה החודשית נבנית לבד, והקבצים מקבלים שמות אחידים.'],
   ]
-  const restore = async (f: File | undefined) => {
-    if (!f) return
-    const d = await readBackup(f)
-    if (!d) return toast('הקובץ הזה אינו קובץ גיבוי של הכלי')
-    setData(() => d)
-    toast(`שוחזרו ${d.patients.length} מטופלים`)
-  }
   const more: { icon: ReactNode; title: string; sub: string; onClick: () => void }[] = [
-    { icon: <Upload size={20} />, title: 'שחזור מקובץ גיבוי', sub: 'מעבירים לכאן מטופלים וסכומים ממחשב או מדפדפן אחר.', onClick: () => fileIn.current?.click() },
+    { icon: <FileSpreadsheet size={20} />, title: 'ייבוא רשימת מטופלים מאקסל', sub: 'כל המטופלים נכנסים בבת אחת, עם תצוגה מקדימה לפני השמירה.', onClick: onImport },
     { icon: <Percent size={20} />, title: 'הגדרת מע״מ ושם המטפל', sub: 'שיעור המע״מ, עוסק פטור, והשם שמופיע מעל הטבלה.', onClick: () => go('settings') },
   ]
   return (
@@ -581,7 +578,6 @@ function Welcome({ ctx, onAdd }: { ctx: Ctx; onAdd: () => void }) {
           ))}
         </div>
       </div>
-      <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => (restore(e.target.files?.[0]), (e.target.value = ''))} />
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', color: c.ink2, fontSize: 14, lineHeight: 1.5 }}>
         <ShieldCheck size={18} style={{ flex: '0 0 18px', marginTop: 2, color: c.ok }} />
         <span>כל המידע נשמר רק בדפדפן הזה, במכשיר הזה. שום דבר לא נשלח לשרת.</span>
