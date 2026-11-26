@@ -62,15 +62,17 @@ export function PageBar({ ctx, title, lead, middle, actions }: { ctx: Ctx; title
   )
 }
 
-/** ⌘P או Ctrl+P פותח חלון של מטופל חדש, כשאין חלון אחר פתוח */
+/** המקש N (בכל שפת מקלדת) פותח חלון של מטופל חדש, כשלא מקלידים בשדה ואין חלון פתוח */
 export function useNewPatientShortcut(open: () => void) {
   const ref = useRef(open)
   ref.current = open
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'p' && e.code !== 'KeyP') return
-      e.preventDefault()
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat || e.code !== 'KeyN') return
+      const t = e.target as HTMLElement | null
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
       if (document.querySelector('[role="dialog"]')) return
+      e.preventDefault()
       ref.current()
     }
     window.addEventListener('keydown', on)

@@ -34,7 +34,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
         title="מטופלים"
         middle={<span>הפרטים מוזנים פעם אחת ומשמשים לכל חודש.</span>}
         actions={
-          <Button kind="primary" icon={<UserPlus size={18} />} onClick={() => setEditing('new')}>
+          <Button kind="primary" icon={<UserPlus size={18} />} onClick={() => setEditing('new')} title="קיצור מקלדת: N" aria-keyshortcuts="N">
             הוספת מטופל
           </Button>
         }

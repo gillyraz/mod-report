@@ -240,7 +240,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
               </select>}
             </div>
             {!wide && (
-              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting}>
+              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting} title="קיצור מקלדת: N" aria-keyshortcuts="N">
               הוספת מטופל
             </Button>)}
           </div>
@@ -274,7 +274,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             <span>לכתוב בטופס</span>
             {/* הכפתור צמוד לטבלה, מעל עמודת הסריקה */}
             <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting}>
+              <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting} title="קיצור מקלדת: N" aria-keyshortcuts="N">
               הוספת מטופל
             </Button>
             </span>
