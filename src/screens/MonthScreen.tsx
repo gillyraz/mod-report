@@ -40,7 +40,17 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     if (sort === 'last') return [...list].sort((a, b) => lastName(a.name).localeCompare(lastName(b.name), 'he'))
     return list // סדר ההוספה: מטופל חדש תמיד בסוף
   }, [data.patients, entries, sort])
-  const eligible = patients.filter((p) => hasSessions(entries[p.id]))
+  // אפשר להכניס לטבלה רק מטופל שיש לו מפגשים וגם סריקה של הטופס
+  const hasScan = (id: string) => scans.some((x) => x.id === entries[id]?.scanId)
+  const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id)
+  const eligible = patients.filter((p) => canReport(p.id))
+  // גרסת הניסיון: מעבר בין שתי חלופות לפעולות הבחירה
+  const [selUi, setSelUi] = useState<'header' | 'float'>('header')
+  useEffect(() => {
+    const on = (e: Event) => setSelUi((e as CustomEvent<'header' | 'float'>).detail)
+    window.addEventListener('proto-sel', on)
+    return () => window.removeEventListener('proto-sel', on)
+  }, [])
   const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], data.settings).total, 0)
   const pct = patients.length ? eligible.length / patients.length : 0
 
@@ -113,8 +123,9 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   // מטופל שאין לו מפגשים יוצא מהבחירה
   useEffect(() => {
     if (!selecting) return
-    setPicked((s) => new Set([...s].filter((id) => hasSessions(entries[id]))))
-  }, [entries, selecting])
+    setPicked((s) => new Set([...s].filter((id) => canReport(id))))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, scans, selecting])
 
   const startSelect = () => {
     setPicked(new Set(eligible.map((p) => p.id)))
@@ -157,7 +168,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         <b style={{ color: c.ink, fontVariantNumeric: 'tabular-nums' }}>
           {eligible.length} מתוך {patients.length}
         </b>{' '}
-        עם מפגשים
+        מוכנים לדיווח
       </span>
       <div style={{ flex: 1, minWidth: 80 }}>
         <Progress pct={pct} />
@@ -169,6 +180,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     </>
   )
 
+  const hint = 'אפשר לסמן רק מטופלים עם מפגשים וסריקה מצורפת'
   const selectActions = (
     <>
       <Button kind="primary" icon={<FileOutput size={18} />} disabled={!picked.size} onClick={() => setReporting(patients.filter((p) => picked.has(p.id)))}>
@@ -190,18 +202,14 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         lead={<MonthSwitcher month={month} setMonth={setMonth} />}
         middle={wide ? status : <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>{status}</div>}
         actions={
-          selecting ? (
-            wide ? selectActions : undefined
-          ) : (
-            <>
-              <Button icon={<FileUp size={18} />} onClick={() => bulkInput.current?.click()} disabled={busy} style={{ flex: wide ? undefined : 1 }}>
-                {busy ? 'קורא קבצים…' : 'ייבוא סריקות'}
-              </Button>
-              <Button kind="primary" icon={<FileOutput size={18} />} onClick={startSelect} disabled={!eligible.length} style={{ flex: wide ? undefined : 1 }}>
-                הפקת דיווח
-              </Button>
-            </>
-          )
+          <>
+            <Button icon={<FileUp size={18} />} onClick={() => bulkInput.current?.click()} disabled={busy || selecting} style={{ flex: wide ? undefined : 1 }}>
+              {busy ? 'קורא קבצים…' : 'ייבוא סריקות'}
+            </Button>
+            <Button kind="primary" icon={<FileOutput size={18} />} onClick={startSelect} disabled={!eligible.length || selecting} title={!eligible.length ? 'אין עדיין מטופל עם מפגשים וסריקה' : undefined} style={{ flex: wide ? undefined : 1 }}>
+              הפקת דיווח
+            </Button>
+          </>
         }
       />
 
@@ -219,22 +227,25 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             <span style={{ fontWeight: 600, textDecoration: 'underline' }}>לשיוך</span>
           </button>
         )}
-        {selecting && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#E8EEF6', color: c.primary, borderRadius: 12, fontSize: 15 }}>
-            <CheckCircle2 size={20} style={{ flex: '0 0 20px' }} />
-            <span>
-              מסמנים את המטופלים שייכנסו לטבלה. מטופל בלי מפגשים החודש לא ניתן לסימון.
-            </span>
+        {selecting && wide && selUi === 'header' ? (
+          // חלופה א: שורת הכותרת של הרשימה מתחלפת בפעולות הבחירה, באותו גובה
+          <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: '#E8EEF6', borderRadius: 12, margin: '-4px 0', padding: '4px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+              <span style={{ fontSize: 17, fontWeight: 600, color: c.primary }}>
+                {picked.size === 1 ? 'נבחר מטופל אחד' : `נבחרו ${picked.size} מטופלים`}
+              </span>
+              <span style={{ fontSize: 14, color: c.ink2 }}>{hint}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>{selectActions}</div>
           </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
-              מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {patients.length}</span>
-            </h2>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.ink2 }}>
-              מיון
-              <select
+        ) : (
+          <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
+                מטופלים <span style={{ color: c.ink2, fontWeight: 400 }}>· {patients.length}</span>
+              </h2>
+              {!wide && <select
+                aria-label="מיון המטופלים"
                 value={sort}
                 onChange={(e) => setSort(e.target.value as Sort)}
                 style={{ height: 32, borderRadius: 8, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 8px', fontSize: 14 }}
@@ -242,15 +253,13 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
                 <option value="added">לפי סדר ההוספה</option>
                 <option value="first">לפי שם פרטי</option>
                 <option value="last">לפי שם משפחה</option>
-              </select>
-            </label>
-          </div>
-          {!selecting && (
-            <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)}>
+              </select>}
+            </div>
+            <Button icon={<UserPlus size={18} />} onClick={() => setAdding(true)} disabled={selecting}>
               הוספת מטופל
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         {wide && (
           <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, alignItems: 'center', padding: '0 24px', fontSize: 13, color: c.ink2, fontWeight: 500 }}>
             {selecting && (
@@ -258,11 +267,23 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
                 checked={allOn}
                 mixed={!allOn && picked.size > 0}
                 disabled={!eligible.length}
-                label={allOn ? 'ביטול הסימון של כולם' : 'סימון כל המטופלים עם מפגשים'}
+                label={allOn ? 'ביטול הסימון של כולם' : 'סימון כל המטופלים שאפשר לדווח'}
                 onChange={() => setPicked(allOn ? new Set() : new Set(eligible.map((p) => p.id)))}
               />
             )}
-            <span>מטופל</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              מטופל
+              <select
+                aria-label="מיון המטופלים"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as Sort)}
+                style={{ height: 28, borderRadius: 6, border: `1px solid ${c.line}`, background: c.surface, color: c.ink, padding: '0 4px', fontSize: 13 }}
+              >
+                <option value="added">לפי סדר ההוספה</option>
+                <option value="first">לפי שם פרטי</option>
+                <option value="last">לפי שם משפחה</option>
+              </select>
+            </span>
             <span>מפגשים חתומים</span>
             <span>ביטולים ללא הודעה</span>
             <span>לכתוב בטופס</span>
@@ -271,7 +292,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: !wide && selecting ? 88 : 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: selecting && (!wide || selUi === 'float') ? 120 : 0 }}>
         {patients.map((p) => (
           <Row
             key={p.id}
@@ -280,7 +301,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             ctx={ctx}
             cols={COLS}
             flash={flash === p.id}
-            select={selecting ? { on: picked.has(p.id), can: hasSessions(entries[p.id]), toggle: () => toggle(p.id) } : undefined}
+            select={selecting ? { on: picked.has(p.id), can: canReport(p.id), toggle: () => toggle(p.id) } : undefined}
             scan={scans.find((x) => x.id === entries[p.id]?.scanId)}
             onAttach={() => {
               target.current = p.id
@@ -294,8 +315,22 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
 
       {/* נייד: פעולות הבחירה בפס תחתון */}
       {!wide && selecting && (
-        <div style={{ position: 'fixed', insetInline: 0, bottom: 'calc(64px + env(safe-area-inset-bottom))', zIndex: 18, background: c.surface, borderTop: `1px solid ${c.line}`, padding: '12px 16px', display: 'flex', gap: 8 }}>
-          {selectActions}
+        <div style={{ position: 'fixed', insetInline: 0, bottom: 'calc(64px + env(safe-area-inset-bottom))', zIndex: 18, background: c.surface, borderTop: `1px solid ${c.line}`, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 13, color: c.ink2 }}>{hint}</span>
+          <div style={{ display: 'flex', gap: 8 }}>{selectActions}</div>
+        </div>
+      )}
+
+      {/* חלופה ב: פס פעולות צף בתחתית המסך */}
+      {wide && selecting && selUi === 'float' && (
+        <div style={{ position: 'fixed', insetInline: 0, bottom: 24, zIndex: 18, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div style={{ pointerEvents: 'auto', background: c.surface, border: `1px solid ${c.line}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(16,22,34,0.18)', padding: '12px 12px 12px 16px', paddingInlineStart: 24, display: 'flex', alignItems: 'center', gap: 24, animation: `rise 320ms ${EASE}` }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 16, fontWeight: 600 }}>{picked.size === 1 ? 'נבחר מטופל אחד' : `נבחרו ${picked.size} מטופלים`}</span>
+              <span style={{ fontSize: 13, color: c.ink2 }}>{hint}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>{selectActions}</div>
+          </div>
         </div>
       )}
 
@@ -423,7 +458,7 @@ function Row({
           </Badge>
         )}
         {has && !scan && <Badge tone="warn">חסרה סריקה</Badge>}
-        {dim && <span style={{ fontSize: 13, color: c.ink2 }}>אין מפגשים החודש</span>}
+        {dim && !has && <span style={{ fontSize: 13, color: c.ink2 }}>אין מפגשים החודש</span>}
       </div>
       <span style={{ fontSize: 13, color: c.ink2, fontVariantNumeric: 'tabular-nums' }}>
         תיק {p.fileNo} · הפנייה {p.referralNo} · {ils(p.rate)} למפגש

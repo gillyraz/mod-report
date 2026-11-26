@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, UserPlus } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, Card } from '../ui'
 import { ils, type Patient } from '../model'
@@ -62,20 +62,29 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
       ) : (
         <Card style={{ overflow: 'hidden' }}>
           {wide && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 48px', gap: 16, padding: '12px 24px', background: c.sub, fontSize: 13, color: c.ink2, fontWeight: 500 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, padding: '12px 24px', background: c.sub, fontSize: 13, color: c.ink2, fontWeight: 500 }}>
               <span>שם</span>
               <span>מספר תיק</span>
               <span>מספר הפנייה</span>
               <span>סכום למפגש</span>
-              <span />
             </div>
           )}
           {list.map((p, i) => (
-            <div
+            <button
               key={p.id}
+              onClick={() => setEditing(p)}
+              aria-label={`עריכת ${p.name}`}
+              className="row-btn"
               style={{
+                width: '100%',
+                border: 'none',
+                background: 'transparent',
+                font: 'inherit',
+                color: 'inherit',
+                textAlign: 'start',
+                cursor: 'pointer',
                 display: 'grid',
-                gridTemplateColumns: wide ? '2fr 1fr 1fr 1fr 48px' : '1fr 40px',
+                gridTemplateColumns: wide ? '2fr 1fr 1fr 1fr' : '1fr',
                 gap: wide ? 16 : 8,
                 alignItems: 'center',
                 padding: wide ? '16px 24px' : 16,
@@ -99,8 +108,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>{ils(p.rate)}</span>
                 </>
               )}
-              <Button kind="ghost" title={`עריכת ${p.name}`} icon={<Pencil size={18} />} onClick={() => setEditing(p)} />
-            </div>
+            </button>
           ))}
         </Card>
       )}

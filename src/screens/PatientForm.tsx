@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Archive, ArchiveRestore } from 'lucide-react'
-import { Button, Field, Sheet } from '../ui'
+import { Archive, ArchiveRestore, CalendarPlus } from 'lucide-react'
+import { Button, c, Field, Sheet } from '../ui'
 import { uid, type Patient } from '../model'
 
 export default function PatientForm({
@@ -26,7 +26,7 @@ export default function PatientForm({
   const submit = () => {
     setTried(true)
     if (missing.length) return
-    onSave({ id: patient?.id ?? uid(), name: name.trim(), fileNo: fileNo.trim(), referralNo: referralNo.trim(), rate: rateNum, archived: patient?.archived })
+    onSave({ id: patient?.id ?? uid(), name: name.trim(), fileNo: fileNo.trim(), referralNo: referralNo.trim(), rate: rateNum, archived: patient?.archived, addedAt: patient?.addedAt ?? Date.now() })
   }
 
   return (
@@ -56,6 +56,12 @@ export default function PatientForm({
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
       >
+        {patient?.addedAt && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.ink2 }}>
+            <CalendarPlus size={16} />
+            נוסף לרשימה ב-{new Date(patient.addedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: 'numeric' })}
+          </div>
+        )}
         <Field label="שם המטופל" value={name} onChange={setName} autoFocus={!patient} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <Field label="מספר תיק" value={fileNo} onChange={setFileNo} inputMode="numeric" dirLtr />

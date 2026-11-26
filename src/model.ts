@@ -14,6 +14,7 @@ export type Patient = {
   referralNo: string
   rate: number // סכום למפגש לפני מע"מ, כפי שמודפס בטופס
   archived?: boolean
+  addedAt?: number // מתי נוסף לרשימה
 }
 
 export type Entry = {
