@@ -1,5 +1,5 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { Minus, Plus, X } from 'lucide-react'
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
+import { CircleAlert, Minus, Plus, X } from 'lucide-react'
 
 export const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
@@ -121,6 +121,7 @@ export function Field({
   suffix,
   dirLtr,
   disabled,
+  error,
 }: {
   label: string
   hint?: string
@@ -132,13 +133,18 @@ export function Field({
   suffix?: string
   dirLtr?: boolean
   disabled?: boolean
+  error?: string
 }) {
   const [focus, setFocus] = useState(false)
+  const id = useId()
+  const described = [error && id + 'e', hint && id + 'h'].filter(Boolean).join(' ') || undefined
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: c.ink2 }}>{label}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+      <label htmlFor={id} style={{ fontSize: 13, fontWeight: 600, color: c.ink2 }}>{label}</label>
       <span style={{ position: 'relative', display: 'flex' }}>
         <input
+          id={id}
+          aria-describedby={described}
           value={value}
           type={type}
           disabled={disabled}
@@ -148,6 +154,7 @@ export function Field({
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
           dir={dirLtr ? 'ltr' : undefined}
+          aria-invalid={error ? true : undefined}
           style={{
             flex: 1,
             minWidth: 0,
@@ -156,7 +163,9 @@ export function Field({
             borderRadius: 12,
             border: 'none',
             outline: 'none',
-            boxShadow: focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.fieldLine}`,
+            boxShadow: error
+              ? `inset 0 0 0 1px ${c.danger}${focus ? ', 0 0 0 4px rgba(196,50,31,0.12)' : ''}`
+              : focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.fieldLine}`,
             background: c.field,
             transition: `box-shadow 200ms ${EASE}, background 200ms ${EASE}`,
             fontSize: 16,
@@ -172,8 +181,14 @@ export function Field({
           </span>
         )}
       </span>
-      {hint && <span style={{ fontSize: 12, color: c.ink3 }}>{hint}</span>}
-    </label>
+      {error && (
+        <span id={id + 'e'} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: c.danger }}>
+          <CircleAlert size={14} style={{ flex: '0 0 14px' }} />
+          {error}
+        </span>
+      )}
+      {hint && <span id={id + 'h'} style={{ fontSize: 12, color: c.ink3 }}>{hint}</span>}
+    </div>
   )
 }
 
