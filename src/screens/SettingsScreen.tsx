@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
+import { DatabaseBackup, KeyRound, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, EASE, Field, lift, Sheet } from '../ui'
 import { WipeAnimation, WIPE_MS } from './WipeAnimation'
 import * as vault from '../vault'
-import { monthLabel, setVatFrom, vatOf, type Data, type Settings } from '../model'
+import { monthLabel, setVatFrom, vatOf, type Data, type Scan, type Settings } from '../model'
 import { downloadFiles } from '../files'
 import { PageBar } from './parts'
 import { PROTO } from '../proto'
 
+const count = (n: number, one: string, many: string) => (n === 1 ? `${one} אחד` : `${n} ${many}`)
+const countF = (n: number, one: string, many: string) => (n === 1 ? `${one} אחת` : n === 0 ? `בלי ${many}` : `${n} ${many}`)
+
 export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
-  const { data, setData, setScans, toast, month } = ctx
+  const { data, setData, scans, setScans, toast, month } = ctx
   const s = data.settings
   const mv = vatOf(data, month)
-  const [pending, setPending] = useState<Data | null>(null)
+  const [pending, setPending] = useState<{ data: Data; scans: Scan[] } | null>(null)
   const fileIn = useRef<HTMLInputElement>(null)
   const [confirmWipe, setConfirmWipe] = useState(false)
   const [wiping, setWiping] = useState<'run' | 'done' | null>(null)
@@ -39,7 +42,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   const [backupErr, setBackupErr] = useState<string>()
 
   const backup = async () => {
-    const bytes = await vault.backupBytes(data)
+    const bytes = await vault.backupBytes(data, scans)
     if (!bytes) return
     const name = `גיבוי_דיווח_חודשי_${new Date().toISOString().slice(0, 10)}.mrv`
     if (PROTO) return toast('בפרוטוטייפ אין שמירת קבצים. בגרסה האמיתית נפתח חלון לבחירת מקום הגיבוי.')
@@ -74,14 +77,14 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
     setAskPw(null)
     setBackupPw('')
     setBackupErr(undefined)
-    if (!data.patients.length) return apply(r.data)
-    setPending(r.data) // יש מידע קיים: מבקשים אישור לפני שמחליפים אותו
+    if (!data.patients.length && !scans.length) return apply(r)
+    setPending(r) // יש מידע קיים: מבקשים אישור לפני שמחליפים אותו
   }
-  const apply = (d: Data) => {
-    setScans(() => [])
-    setData(() => d)
+  const apply = (b: { data: Data; scans: Scan[] }) => {
+    setScans(() => b.scans)
+    setData(() => b.data)
     setPending(null)
-    toast(`שוחזרו ${d.patients.length} מטופלים`)
+    toast(b.scans.length ? `שוחזרו ${b.data.patients.length} מטופלים ו-${b.scans.length} סריקות` : `שוחזרו ${b.data.patients.length} מטופלים`)
   }
   const move = async () => {
     const r = await vault.moveFolder()
@@ -131,7 +134,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
 
       <Section wide={ctx.wide} title="גיבוי" desc="קובץ נוסף עם המטופלים והסכומים, למעבר מחשב או לשחזור.">
         <p style={{ margin: 0, color: c.ink2, fontSize: 15, lineHeight: 1.6, maxWidth: 640 }}>
-          {vault.isFolder() ? 'העתקה של התיקייה היא הגיבוי המלא, כולל הסריקות. ' : ''}קובץ הגיבוי שומר את המטופלים והסכומים בלבד, מוצפן באותה סיסמה. הסריקות לא נכללות בו.
+          קובץ הגיבוי שומר את כל המידע: המטופלים, הסכומים והסריקות. הוא מוצפן באותה סיסמה.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button icon={<DatabaseBackup size={18} />} onClick={backup}>
@@ -142,33 +145,64 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
           </Button>
         </div>
         {pending && (
-          <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.warnSoft, borderRadius: 12 }}>
-            <span style={{ color: c.warn, fontSize: 15, lineHeight: 1.6 }}>
-              השחזור יחליף את {data.patients.length} המטופלים והסכומים שיש עכשיו ב-{pending.patients.length} המטופלים מהקובץ. הסריקות שצורפו יוסרו, כי הן לא נשמרות בגיבוי.
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button kind="primary" onClick={() => apply(pending)}>
-                החלפת המידע במידע מהקובץ
-              </Button>
-              <Button kind="ghost" onClick={() => setPending(null)}>
-                ביטול
-              </Button>
+          <Sheet
+            title="שחזור מקובץ גיבוי"
+            icon={<Upload size={20} />}
+            onClose={() => setPending(null)}
+            footer={
+              <>
+                <Button kind="primary" onClick={() => apply(pending)}>
+                  החלפת המידע במידע מהקובץ
+                </Button>
+                <Button kind="ghost" onClick={() => setPending(null)}>
+                  ביטול
+                </Button>
+              </>
+            }
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                ['עכשיו במחשב', data.patients.length, scans.length],
+                ['בקובץ הגיבוי', pending.data.patients.length, pending.scans.length],
+              ].map(([label, pts, scs]) => (
+                <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: c.sub, borderRadius: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: c.ink3 }}>{label}</span>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: c.ink, lineHeight: 1.5 }}>
+                    {count(pts as number, 'מטופל', 'מטופלים')}
+                    <br />
+                    {countF(scs as number, 'סריקה', 'סריקות')}
+                  </span>
+                </div>
+              ))}
             </div>
-          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 16, fontWeight: 600, color: c.ink }}>האם להחליף את המידע?</span>
+              <span style={{ fontSize: 14, color: c.ink2, lineHeight: 1.6 }}>המידע שיש עכשיו יוחלף במידע מהקובץ, ואי אפשר לבטל את זה אחרי האישור.</span>
+            </div>
+          </Sheet>
         )}
         {askPw && (
-          <form
-            onSubmit={(e) => (e.preventDefault(), restoreBytes(askPw, backupPw))}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, background: c.sub, borderRadius: 12 }}
+          <Sheet
+            title="הגיבוי נוצר עם סיסמה אחרת"
+            icon={<KeyRound size={20} />}
+            onClose={() => (setAskPw(null), setBackupPw(''), setBackupErr(undefined))}
+            footer={
+              <>
+                <Button kind="primary" onClick={() => restoreBytes(askPw, backupPw)}>
+                  פתיחת הגיבוי
+                </Button>
+                <Button kind="ghost" onClick={() => (setAskPw(null), setBackupPw(''), setBackupErr(undefined))}>
+                  ביטול
+                </Button>
+              </>
+            }
           >
-            <span style={{ fontSize: 15, lineHeight: 1.6 }}>הגיבוי הזה נוצר עם סיסמה אחרת. מזינים את הסיסמה שהייתה בזמן יצירת הגיבוי.</span>
-            <Field label="הסיסמה של הגיבוי" type="password" value={backupPw} onChange={(v) => (setBackupPw(v), setBackupErr(undefined))} autoFocus />
-            {backupErr && <span role="alert" style={{ color: c.danger, fontSize: 14 }}>{backupErr}</span>}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button kind="primary" type="submit">פתיחת הגיבוי</Button>
-              <Button kind="ghost" onClick={() => (setAskPw(null), setBackupPw(''), setBackupErr(undefined))}>ביטול</Button>
-            </div>
-          </form>
+            <form onSubmit={(e) => (e.preventDefault(), restoreBytes(askPw, backupPw))} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{ margin: 0, fontSize: 15, color: c.ink2, lineHeight: 1.7 }}>מזינים את הסיסמה שהייתה בזמן יצירת הגיבוי.</p>
+              <Field label="הסיסמה של הגיבוי" type="password" value={backupPw} onChange={(v) => (setBackupPw(v), setBackupErr(undefined))} autoFocus error={backupErr} />
+              <button type="submit" hidden />
+            </form>
+          </Sheet>
         )}
         <input ref={fileIn} type="file" accept=".mrv,application/json,.json" hidden onChange={(e) => (restore(e.target.files?.[0]), (e.target.value = ''))} />
       </Section>

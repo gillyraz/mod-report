@@ -158,7 +158,7 @@ async function unseal(key: CryptoKey, b: Uint8Array) {
 
 // ---------- מצב הכספת ----------
 type Meta = Omit<Scan, 'blob'>
-type Payload = { app: 'mod-report'; v: 1; data: Data; scans: Meta[] }
+type Payload = { app: 'mod-report'; v: 1 | 2; data: Data; scans: Meta[]; files?: Record<string, string> }
 
 let store: Store | null = null
 let lastDir: Dir | null = null
@@ -370,14 +370,26 @@ export async function moveFolder(): Promise<Move> {
   return { ok: true, label: dir.name }
 }
 
-/** גיבוי לקובץ: עותק מוצפן של המידע (בלי הסריקות) */
-export async function backupBytes(data: Data) {
+const toB64 = (u: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+const fromB64 = (b: string) => Uint8Array.from(atob(b), (ch) => ch.charCodeAt(0))
+
+/** גיבוי לקובץ: עותק מוצפן של כל המידע, כולל הסריקות */
+export async function backupBytes(data: Data, scans: Scan[]) {
   if (!key || !salt) return null
-  const payload: Payload = { app: 'mod-report', v: 1, data, scans: [] }
+  const files: Record<string, string> = {}
+  for (const sc of scans) files[sc.id] = toB64(new Uint8Array(await sc.blob.arrayBuffer()))
+  const payload: Payload = { app: 'mod-report', v: 2, data, scans: scans.map(({ blob: _b, ...m }) => m), files }
   return seal(key, salt, enc.encode(JSON.stringify(payload)))
 }
 
-export type ReadBackup = { ok: true; data: Data } | { ok: false; reason: 'password' | 'invalid' }
+export type ReadBackup = { ok: true; data: Data; scans: Scan[] } | { ok: false; reason: 'password' | 'invalid' }
+
+const scansOf = (p: Payload): Scan[] =>
+  (p.scans ?? []).flatMap((m) => (p.files?.[m.id] ? [{ ...m, blob: new Blob([fromB64(p.files[m.id]) as BlobPart], { type: m.type }) }] : []))
 
 /** קריאת קובץ גיבוי: מוצפן (בסיסמה הנוכחית או בסיסמה שהוזנה) או קובץ גיבוי ישן */
 export async function readBackup(bytes: Uint8Array, password?: string): Promise<ReadBackup> {
@@ -386,7 +398,7 @@ export async function readBackup(bytes: Uint8Array, password?: string): Promise<
       const k = password ? await deriveKey(password, saltOf(bytes)) : salt && equal(saltOf(bytes), salt) ? key! : null
       if (!k) return { ok: false, reason: 'password' }
       const p = JSON.parse(dec.decode(await unseal(k, bytes))) as Payload
-      return { ok: true, data: normalize(p.data) }
+      return { ok: true, data: normalize(p.data), scans: scansOf(p) }
     } catch {
       return { ok: false, reason: 'password' }
     }
@@ -394,7 +406,7 @@ export async function readBackup(bytes: Uint8Array, password?: string): Promise<
   try {
     const j = JSON.parse(dec.decode(bytes)) as { app?: string; data?: Data }
     if (j.app !== 'mod-report' || !j.data?.patients) return { ok: false, reason: 'invalid' }
-    return { ok: true, data: normalize(j.data) }
+    return { ok: true, data: normalize(j.data), scans: [] }
   } catch {
     return { ok: false, reason: 'invalid' }
   }
