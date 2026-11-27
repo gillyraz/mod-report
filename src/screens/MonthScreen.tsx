@@ -56,7 +56,6 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   // וגם כל הפרטים שלו מלאים (מספר תיק, הפנייה וסכום)
   const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id) && !incomplete(id)
   const eligible = patients.filter((p) => canReport(p.id))
-  const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], vatOf(data, month)).total, 0)
   // הטבלה של החודש: מתי נשמרה, ואם הנתונים השתנו מאז
   const sumOf = (ids: string[]) => ids.reduce((a, id) => {
     const p = data.patients.find((x) => x.id === id)
@@ -279,10 +278,6 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flex: wide ? '0 0 auto' : '1 1 100%' }}>
           <div style={glass}>
-            <div style={{ fontSize: 12, color: c.ink3, fontWeight: 500 }}>סה״כ כל הטפסים</div>
-            <div style={{ fontSize: 22, fontWeight: 600, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</div>
-          </div>
-          <div style={glass}>
             <div style={{ fontSize: 12, color: c.ink3, fontWeight: 500 }}>מע״מ</div>
             <div style={{ marginTop: 6 }}>
               <VatInline ctx={ctx} />
@@ -354,10 +349,6 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
               </div>
               <div style={{ fontWeight: 600, fontSize: 16, color: c.navy, fontVariantNumeric: 'tabular-nums' }}>{ils(readyTotal)}</div>
             </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: c.ink3, fontWeight: 500 }}>סה״כ כל הטפסים</div>
-            <div style={{ fontWeight: 600, fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>{ils(total)}</div>
           </div>
           <span style={{ flex: 1 }} />
           <div style={{ display: 'flex', gap: 8 }}>{pageActions(40)}</div>
