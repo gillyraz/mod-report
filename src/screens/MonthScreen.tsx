@@ -11,6 +11,7 @@ import ScanSheet from './ScanSheet'
 import { Avatar, MonthSwitcher, PageBar } from './parts'
 import PatientForm from './PatientForm'
 import ReportSheet from './ReportSheet'
+import Tour from './Tour'
 
 type Sort = 'added' | 'first' | 'last'
 const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? ''
@@ -327,9 +328,11 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       <Button icon={<FileUp size={18} />} onClick={() => bulkInput.current?.click()} disabled={busy || selecting} style={{ flex: wide ? undefined : 1, height: h }}>
         {busy ? 'קורא קבצים…' : 'ייבוא סריקות'}
       </Button>
+      <span data-tour="report" style={{ display: 'flex', flex: wide ? undefined : 1 }}>
       <Button kind="primary" icon={<FileOutput size={18} />} onClick={() => startSelect()} disabled={!eligible.length || selecting} title={!eligible.length ? 'אין עדיין מטופל עם מפגשים וסריקה' : undefined} style={{ flex: wide ? undefined : 1, height: h }}>
         הפקת דיווח
       </Button>
+      </span>
     </>
   )
 
@@ -431,7 +434,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         ctx={ctx}
         title="החודש"
         sub="מזינים מפגשים, מצרפים סריקות ומפיקים את הטבלה החודשית."
-        lead={<MonthSwitcher month={month} setMonth={setMonth} disabled={selecting} />}
+        lead={<span data-tour="month" style={{ display: 'inline-flex' }}><MonthSwitcher month={month} setMonth={setMonth} disabled={selecting} /></span>}
         actions={pageActions()}
       />
 
@@ -467,7 +470,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         </Button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: selecting ? 120 : 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: selecting || wide ? 120 : 0 }}>
         {q && !shown.length && (
           <div style={{ padding: 24, background: c.surface, boxShadow: lift, borderRadius: 16, fontSize: 15, color: c.ink2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <span>אין מטופל שמתאים ל״{q}״.</span>
@@ -574,6 +577,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
           }}
         />
       )}
+      <Tour ready={wide && patients.length > 0 && !selecting && !adding && !fixing && !importing && !reporting && !assigning && !viewScan} headerH={headerH} />
     </div>
   )
 }
@@ -726,10 +730,12 @@ function Row({
       <div id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 'clamp(12px, 1.6vw, 24px)', alignItems: 'center', padding: '12px 24px', minHeight: 80, ...look }}>
         {box}
         {who}
-        <Stepper hideLabel label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
+        <div data-tour="sessions" style={{ justifySelf: 'start' }}>
+          <Stepper hideLabel label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
+        </div>
         <Stepper hideLabel label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
         {sums}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{scanCell}</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}><span data-tour="scan" style={{ display: 'flex' }}>{scanCell}</span></div>
       </div>
     )
 

@@ -17,10 +17,17 @@ export default function Gate({ boot, wide, onOpen }: { boot: vault.Boot; wide: b
   const [step, setStep] = useState<Step>(() => (boot.state === 'locked' ? { s: 'unlock', label: boot.label, needsPermission: boot.needsPermission } : { s: 'folder' }))
   const [note, setNote] = useState<string>()
 
+  const [refused, setRefused] = useState<'cancel' | 'denied'>()
   const pick = async () => {
     setNote(undefined)
+    setRefused(undefined)
     const r = await vault.pickFolder()
-    if (!r.ok) return r.reason === 'unsupported' && setNote('הדפדפן הזה לא מאפשר לבחור תיקייה. כדאי לפתוח את הכלי בכרום במחשב.')
+    if (!r.ok) {
+      if (r.reason === 'unsupported') return setNote('הדפדפן הזה לא מאפשר לבחור תיקייה. כדאי לפתוח את הכלי בכרום במחשב.')
+      // חוזרים למסך בחירת התיקייה ומסבירים מה קרה, גם אם הבחירה התחילה ממסך הנעילה
+      setStep({ s: 'folder' })
+      return setRefused(r.reason)
+    }
     // בתיקייה כבר יש מידע של הכלי: פותחים אותו במקום ליצור חדש
     setStep(r.existing ? { s: 'unlock', label: r.label, needsPermission: false } : { s: 'password', label: r.label })
     if (r.existing) setNote('בתיקייה הזו כבר שמור מידע של הכלי. מזינים את הסיסמה שלו כדי לפתוח אותו.')
@@ -43,9 +50,9 @@ export default function Gate({ boot, wide, onOpen }: { boot: vault.Boot; wide: b
       </header>
       <main style={{ flex: 1, padding: wide ? '56px 32px' : '24px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
         {phone && <PhoneStep />}
-        {!phone && step.s === 'folder' && <FolderStep wide={wide} onPick={pick} note={note} />}
+        {!phone && step.s === 'folder' && <FolderStep wide={wide} onPick={pick} note={note} refused={refused} />}
         {!phone && step.s === 'password' && <PasswordStep wide={wide} label={step.label} folders={folders} onBack={() => (setNote(undefined), setStep({ s: 'folder' }))} onOpen={onOpen} />}
-        {!phone && step.s === 'unlock' && <UnlockStep wide={wide} label={step.label} note={note} onOpen={onOpen} onOther={folders ? pick : undefined} />}
+        {!phone && step.s === 'unlock' && <UnlockStep wide={wide} label={step.label} note={note} needsPermission={step.needsPermission} onOpen={onOpen} onOther={folders ? pick : undefined} />}
       </main>
     </div>
   )
@@ -116,7 +123,39 @@ function FolderArt() {
   )
 }
 
-function FolderStep({ wide, onPick, note }: { wide: boolean; onPick: () => void; note?: string }) {
+/** תמונה מוקטנת של החלון של כרום, כדי לזהות אותו כשהוא קופץ. הכפתור שלוחצים עליו מסומן */
+export function ChromePrompt({ folder, buttons, pick }: { folder: string; buttons: string[]; pick: string }) {
+  return (
+    <div aria-hidden dir="ltr" style={{ alignSelf: 'center', width: '100%', maxWidth: 400, padding: '16px 16px', borderRadius: 14, background: '#202124', color: '#E8EAED', textAlign: 'left', boxShadow: '0 12px 24px -12px rgba(16,24,40,0.5)', fontFamily: 'inherit' }}>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>Allow this site to edit files?</div>
+      <div style={{ fontSize: 12, color: '#BDC1C6', marginTop: 8, lineHeight: 1.5 }}>
+        gillyraz.github.io will be able to edit files in <bdi style={{ color: '#E8EAED', fontWeight: 700, whiteSpace: 'nowrap' }}>{folder}</bdi>
+      </div>
+      <div style={{ display: 'flex', flexDirection: buttons.length > 2 ? 'column' : 'row', alignItems: buttons.length > 2 ? 'stretch' : undefined, justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        {buttons.map((b) => (
+          <span key={b} style={{ height: 32, padding: '0 14px', borderRadius: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', background: '#1F3A5F', color: b === pick ? '#D2E3FC' : 'rgba(210,227,252,0.5)', boxShadow: b === pick ? '0 0 0 2px #202124, 0 0 0 4px #F5B400' : undefined }}>
+            {b}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** הסבר לפני שהחלון של כרום קופץ: כותרת, מה לוחצים, ותמונה של החלון */
+function PromptHint({ title, children, prompt }: { title: string; children: ReactNode; prompt: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 20px 20px', borderRadius: 14, background: c.warnSoft, color: c.primaryInk, fontSize: 13, lineHeight: 1.6, textAlign: 'start' }}>
+      <div>
+        <b style={{ display: 'block', fontSize: 14 }}>{title}</b>
+        {children}
+      </div>
+      {prompt}
+    </div>
+  )
+}
+
+function FolderStep({ wide, onPick, note, refused }: { wide: boolean; onPick: () => void; note?: string; refused?: 'cancel' | 'denied' }) {
   return (
     <Card art={<FolderArt />}>
       <div style={{ padding: wide ? '32px 40px 36px' : 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -125,11 +164,20 @@ function FolderStep({ wide, onPick, note }: { wide: boolean; onPick: () => void;
         <p style={lead}>בוחרים תיקייה במחשב. רשימת המטופלים, הסריקות והטבלאות יישמרו בה ורק בה. התיקייה היא גם הגיבוי: מעתיקים אותה, ויש עותק של הכול.</p>
         <Note tone="tip">עדיף תיקייה שלא מסונכרנת לענן (לא בתוך Google Drive או OneDrive), כדי שהמידע לא ייצא מהמחשב.</Note>
         {note && <Note tone="danger">{note}</Note>}
+        {refused ? (
+          <Note tone="danger">
+            <b style={{ display: 'block', fontSize: 14 }}>{refused === 'denied' ? 'לא ניתן אישור לתיקייה, ולכן המידע לא יכול להישמר בה.' : 'לא נבחרה תיקייה, או שבחלון של כרום נלחץ Don\'t Allow.'}</b>
+            לוחצים שוב על ״בחירת תיקייה במחשב״, בוחרים תיקייה, ובחלון של כרום לוחצים <b>Allow</b>. בלי האישור המידע לא יכול להישמר.
+          </Note>
+        ) : (
+          <PromptHint title="אחרי בחירת התיקייה כרום ישאל אם לאפשר לאתר לערוך קבצים." prompt={<ChromePrompt folder="דיווח חודשי" buttons={["Don't Allow", 'Allow']} pick="Allow" />}>
+            לוחצים <b>Allow</b>. בלי האישור הכלי לא יכול לשמור את המידע. האישור הוא רק לתיקייה שבחרתם.
+          </PromptHint>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
           <Button kind="primary" icon={<FolderOpen size={18} />} onClick={onPick} style={{ height: 48, padding: '0 22px', fontSize: 15 }}>
             בחירת תיקייה במחשב
           </Button>
-          <span style={{ fontSize: 13, color: c.ink3 }}>כרום יבקש לאשר גישה לתיקייה</span>
         </div>
       </div>
     </Card>
@@ -213,9 +261,10 @@ function PasswordStep({ wide, label, folders, onBack, onOpen }: { wide: boolean;
   )
 }
 
-function UnlockStep({ wide, label, note, onOpen, onOther }: { wide: boolean; label: string; note?: string; onOpen: (o: Opened) => void; onOther?: () => void }) {
+function UnlockStep({ wide, label, note, needsPermission, onOpen, onOther }: { wide: boolean; label: string; note?: string; needsPermission: boolean; onOpen: (o: Opened) => void; onOther?: () => void }) {
   const [pw, setPw] = useState('')
   const [err, setErr] = useState<string>()
+  const [denied, setDenied] = useState(false)
   const [busy, setBusy] = useState(false)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -226,6 +275,7 @@ function UnlockStep({ wide, label, note, onOpen, onOther }: { wide: boolean; lab
     const r = await vault.unlock(pw)
     setBusy(false)
     if (r.ok) return onOpen(r)
+    setDenied(r.reason === 'permission')
     setErr(r.reason === 'password' ? 'הסיסמה לא נכונה. נסו שוב.' : r.reason === 'permission' ? 'בלי אישור גישה לתיקייה אי אפשר לפתוח את המידע. לוחצים שוב ומאשרים בחלון של כרום.' : 'לא נמצא קובץ המידע בתיקייה. אולי התיקייה הועברה או נמחקה. אפשר לפתוח מתיקייה אחרת.')
   }
   return (
@@ -248,6 +298,13 @@ function UnlockStep({ wide, label, note, onOpen, onOther }: { wide: boolean; lab
           <PasswordField label="סיסמה" value={pw} onChange={(v) => (setPw(v), setErr(undefined))} autoFocus autoComplete="current-password" invalid={!!err} />
         </div>
         {err && <div style={{ width: '100%', textAlign: 'start' }}><Note tone="danger">{err}</Note></div>}
+        {needsPermission && (!err || denied) && (
+          <div style={{ width: '100%', marginTop: 8 }}>
+            <PromptHint title="אחרי הסיסמה כרום ישאל שוב על גישה לתיקייה." prompt={<ChromePrompt folder={label} buttons={['Allow this time', 'Allow on every visit', "Don't allow"]} pick="Allow on every visit" />}>
+              לוחצים <b>Allow on every visit</b>, וכרום לא ישאל שוב בכניסות הבאות.
+            </PromptHint>
+          </div>
+        )}
         <Button kind="primary" type="submit" icon={<LockOpen size={18} />} disabled={busy} style={{ height: 48, width: '100%', justifyContent: 'center', fontSize: 15, marginTop: 8 }}>
           {busy ? 'פותח…' : 'פתיחת הכלי'}
         </Button>

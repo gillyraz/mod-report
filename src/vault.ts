@@ -1,5 +1,6 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval'
 import { PROTO } from './proto'
+import { forgetTour } from './screens/Tour'
 import { defaultSettings, loadData, loadScans, wipeAll as wipeLegacy, type Data, type Scan } from './model'
 
 /*
@@ -188,7 +189,8 @@ export async function boot(): Promise<Boot> {
 }
 let protoCfg: Config | undefined
 
-export type Pick = { ok: true; label: string; existing: boolean } | { ok: false; reason: 'cancel' | 'unsupported' }
+// כרום מחזיר AbortError גם כשסוגרים את חלון הבחירה וגם כשלוחצים Don't Allow, ולכן 'cancel' מכסה את שניהם
+export type Pick = { ok: true; label: string; existing: boolean } | { ok: false; reason: 'cancel' | 'denied' | 'unsupported' }
 
 /** בחירת תיקייה. מחזיר אם כבר יש בה מידע של הכלי */
 export async function pickFolder(): Promise<Pick> {
@@ -201,8 +203,8 @@ export async function pickFolder(): Promise<Pick> {
     const dir = (await (window as unknown as { showDirectoryPicker: (o: object) => Promise<Dir> }).showDirectoryPicker({ mode: 'readwrite', id: 'mod-report', startIn: 'documents' })) as Dir
     store = fsStore(dir)
     return { ok: true, label: dir.name, existing: !!(await store.read(DATA)) }
-  } catch {
-    return { ok: false, reason: 'cancel' }
+  } catch (e) {
+    return { ok: false, reason: (e as Error)?.name === 'NotAllowedError' ? 'denied' : 'cancel' }
   }
 }
 
@@ -427,6 +429,7 @@ export async function wipe() {
     await store.remove(DATA)
     await store.removeRootIfEmpty?.()
   }
+  forgetTour()
   if (PROTO) protoCfg = undefined
   else (await idbDel(CONFIG).catch(() => {}), await wipeLegacy().catch(() => {}))
   store = null
