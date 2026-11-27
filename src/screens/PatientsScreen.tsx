@@ -41,7 +41,7 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
       <PageBar
         ctx={ctx}
         title="מטופלים"
-        sub="הפרטים מוזנים פעם אחת ומשמשים לכל חודש."
+        sub="הפרטים מוזנים פעם אחת."
         actions={
           firstRun ? undefined : <>
           <Button icon={<FileSpreadsheet size={18} />} onClick={() => setImporting(true)}>
