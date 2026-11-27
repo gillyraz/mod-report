@@ -222,7 +222,7 @@ export function Badge({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; child
 }
 
 /** חלון: בדסקטופ במרכז, בנייד כגיליון מלמטה. נסגר רק מהכפתורים שלו */
-export function Sheet({ title, sub, icon, onClose, children, footer, wide }: { title: string; sub?: ReactNode; icon?: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+export function Sheet({ title, sub, icon, onClose, children, footer, wide, tone }: { title: string; sub?: ReactNode; icon?: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; tone?: 'danger' }) {
   const desk = useWide(700)
   // המסך שמאחורי החלון לא נגלל כל עוד החלון פתוח
   useEffect(() => {
@@ -259,7 +259,7 @@ export function Sheet({ title, sub, icon, onClose, children, footer, wide }: { t
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: `${px}px ${px}px 8px` }}>
           {icon && (
-            <span aria-hidden style={{ flex: '0 0 44px', height: 44, borderRadius: 14, background: c.primarySoft, color: c.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span aria-hidden style={{ flex: '0 0 44px', height: 44, borderRadius: 14, background: tone === 'danger' ? c.dangerBg : c.primarySoft, color: tone === 'danger' ? c.danger : c.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {icon}
             </span>
           )}

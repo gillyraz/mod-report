@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
-import { Button, c, EASE, Field, lift } from '../ui'
+import { Button, c, EASE, Field, lift, Sheet } from '../ui'
 import * as vault from '../vault'
 import { monthLabel, setVatFrom, vatOf, type Data, type Settings } from '../model'
 import { downloadFiles } from '../files'
@@ -172,31 +172,41 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
       </Section>
 
       <Section wide={ctx.wide} title="מחיקה" desc="מחיקה של כל המידע מהתיקייה ומהמחשב הזה.">
-        {!confirmWipe ? (
-          <Button kind="danger" icon={<Trash2 size={18} />} onClick={() => setConfirmWipe(true)} style={{ alignSelf: 'flex-start' }}>
-            מחיקת כל המידע
-          </Button>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16, background: c.dangerBg, borderRadius: 12 }}>
-            <span style={{ color: c.danger, fontSize: 15 }}>כל המטופלים, הסכומים והסריקות יימחקו מהתיקייה ומהמחשב, והכלי יחזור למסך הפתיחה. אי אפשר לשחזר אותם בלי קובץ גיבוי. טבלאות שכבר הופקו נשארות בתיקייה.</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button
-                kind="primary"
-                style={{ background: c.danger }}
-                onClick={async () => {
-                  await vault.wipe()
-                  setConfirmWipe(false)
-                  ctx.restart()
-                  toast('כל המידע נמחק')
-                }}
-              >
-                כן, למחוק הכול
-              </Button>
-              <Button kind="ghost" onClick={() => setConfirmWipe(false)}>
-                ביטול
-              </Button>
-            </div>
-          </div>
+        <Button kind="danger" icon={<Trash2 size={18} />} onClick={() => setConfirmWipe(true)} style={{ alignSelf: 'flex-start' }}>
+          מחיקת כל המידע
+        </Button>
+        {confirmWipe && (
+          <Sheet
+            tone="danger"
+            title="למחוק את כל המידע?"
+            icon={<Trash2 size={20} />}
+            onClose={() => setConfirmWipe(false)}
+            footer={
+              <>
+                <Button
+                  kind="primary"
+                  style={{ background: c.danger, boxShadow: 'none' }}
+                  onClick={async () => {
+                    await vault.wipe()
+                    setConfirmWipe(false)
+                    ctx.restart()
+                    toast('כל המידע נמחק')
+                  }}
+                >
+                  מחיקת כל המידע
+                </Button>
+                <Button kind="ghost" onClick={() => setConfirmWipe(false)}>
+                  ביטול
+                </Button>
+              </>
+            }
+          >
+            <p style={{ margin: 0, fontSize: 15, color: c.ink2, lineHeight: 1.7 }}>
+              {vault.isFolder() ? <>כל המידע בתיקייה ״{vault.folderLabel()}״ במחשב יימחק: המטופלים, הסכומים, הסריקות והטבלאות שנשמרו.</> : 'כל המידע יימחק: המטופלים, הסכומים והסריקות.'}
+              <br />
+              אי אפשר לשחזר אותו בלי קובץ גיבוי.
+            </p>
+          </Sheet>
         )}
       </Section>
     </div>

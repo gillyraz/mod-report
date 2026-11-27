@@ -39,6 +39,10 @@ interface Store {
   write(path: string, bytes: Uint8Array): Promise<void>
   remove(path: string): Promise<void>
   list(dir: string): Promise<string[]>
+  /** מחיקת תת-תיקייה וכל מה שבתוכה */
+  removeDir?(name: string): Promise<void>
+  /** מחיקת התיקייה עצמה, רק אם נשארה ריקה */
+  removeRootIfEmpty?(): Promise<void>
   sub?(name: string): Promise<Dir>
 }
 
@@ -90,6 +94,21 @@ function fsStore(root: Dir): Store {
       }
     },
     sub: (name) => at([name], true),
+    async removeDir(name) {
+      try {
+        await root.removeEntry(name, { recursive: true })
+      } catch {
+        /* כבר לא קיימת */
+      }
+    },
+    async removeRootIfEmpty() {
+      try {
+        for await (const _ of root.entries()) return // יש בה קבצים שלא שייכים לכלי: לא נוגעים בה
+        await (root as Dir & { remove?: () => Promise<void> }).remove?.()
+      } catch {
+        /* הדפדפן לא מאפשר למחוק את התיקייה עצמה. היא נשארת ריקה */
+      }
+    },
   }
 }
 
@@ -388,8 +407,13 @@ export async function wipe() {
   pending = null
   await queue
   if (store) {
-    for (const n of await store.list(SCAN_DIR)) await store.remove(`${SCAN_DIR}/${n}`)
+    // כל מה שהכלי יצר בתיקייה: קובץ המידע, הסריקות והטבלאות שנשמרו
+    if (store.removeDir) {
+      await store.removeDir(SCAN_DIR)
+      await store.removeDir(TABLE_DIR)
+    } else for (const n of await store.list(SCAN_DIR)) await store.remove(`${SCAN_DIR}/${n}`)
     await store.remove(DATA)
+    await store.removeRootIfEmpty?.()
   }
   if (PROTO) protoCfg = undefined
   else (await idbDel(CONFIG).catch(() => {}), await wipeLegacy().catch(() => {}))
