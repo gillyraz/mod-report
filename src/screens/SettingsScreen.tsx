@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DatabaseBackup, Trash2, Upload } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Button, c, EASE, Field, lift, Sheet } from '../ui'
+import { WipeAnimation, WIPE_MS } from './WipeAnimation'
 import * as vault from '../vault'
 import { monthLabel, setVatFrom, vatOf, type Data, type Settings } from '../model'
 import { downloadFiles } from '../files'
@@ -15,6 +16,7 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
   const [pending, setPending] = useState<Data | null>(null)
   const fileIn = useRef<HTMLInputElement>(null)
   const [confirmWipe, setConfirmWipe] = useState(false)
+  const [wiping, setWiping] = useState<'run' | 'done' | null>(null)
   const [vatText, setVatText] = useState(String(mv.rate))
   useEffect(() => {
     if (parseFloat(vatText) !== mv.rate) setVatText(String(mv.rate))
@@ -175,37 +177,43 @@ export default function SettingsScreen({ ctx }: { ctx: Ctx }) {
         <Button kind="danger" icon={<Trash2 size={18} />} onClick={() => setConfirmWipe(true)} style={{ alignSelf: 'flex-start' }}>
           מחיקת כל המידע
         </Button>
-        {confirmWipe && (
+        {wiping && <WipeAnimation done={wiping === 'done'} />}
+        {confirmWipe && !wiping && (
           <Sheet
             tone="danger"
             title="למחוק את כל המידע?"
             icon={<Trash2 size={20} />}
             onClose={() => setConfirmWipe(false)}
             footer={
-              <>
-                <Button
-                  kind="primary"
-                  style={{ background: c.danger, boxShadow: 'none' }}
-                  onClick={async () => {
-                    await vault.wipe()
-                    setConfirmWipe(false)
-                    ctx.restart()
-                    toast('כל המידע נמחק')
-                  }}
-                >
-                  מחיקת כל המידע
-                </Button>
-                <Button kind="ghost" onClick={() => setConfirmWipe(false)}>
-                  ביטול
-                </Button>
-              </>
+                <>
+                  <Button
+                    kind="primary"
+                    style={{ background: c.danger, boxShadow: 'none' }}
+                    onClick={async () => {
+                      setWiping('run')
+                      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+                      await Promise.all([vault.wipe(), new Promise((r) => setTimeout(r, reduce ? 0 : WIPE_MS))])
+                      setWiping('done')
+                      await new Promise((r) => setTimeout(r, 1100))
+                      setWiping(null)
+                      setConfirmWipe(false)
+                      ctx.restart()
+                      toast('כל המידע נמחק')
+                    }}
+                  >
+                    מחיקת כל המידע
+                  </Button>
+                  <Button kind="ghost" onClick={() => setConfirmWipe(false)}>
+                    ביטול
+                  </Button>
+                </>
             }
           >
-            <p style={{ margin: 0, fontSize: 15, color: c.ink2, lineHeight: 1.7 }}>
-              {vault.isFolder() ? <>כל המידע בתיקייה ״{vault.folderLabel()}״ במחשב יימחק: המטופלים, הסכומים, הסריקות והטבלאות שנשמרו.</> : 'כל המידע יימחק: המטופלים, הסכומים והסריקות.'}
-              <br />
-              אי אפשר לשחזר אותו בלי קובץ גיבוי.
-            </p>
+              <p style={{ margin: 0, fontSize: 15, color: c.ink2, lineHeight: 1.7 }}>
+                {vault.isFolder() ? <>כל המידע בתיקייה ״{vault.folderLabel()}״ במחשב יימחק: המטופלים, הסכומים, הסריקות והטבלאות שנשמרו.</> : 'כל המידע יימחק: המטופלים, הסכומים והסריקות.'}
+                <br />
+                אי אפשר לשחזר אותו בלי קובץ גיבוי.
+              </p>
           </Sheet>
         )}
       </Section>
