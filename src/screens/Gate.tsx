@@ -48,7 +48,7 @@ export default function Gate({ boot, wide, onOpen }: { boot: vault.Boot; wide: b
           )}
         </div>
       </header>
-      <main style={{ flex: 1, padding: wide ? '56px 32px' : '24px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+      <main style={{ flex: 1, padding: wide ? '24px 32px 48px' : '24px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
         {phone && <PhoneStep />}
         {!phone && step.s === 'folder' && <FolderStep wide={wide} onPick={pick} note={note} refused={refused} />}
         {!phone && step.s === 'password' && <PasswordStep wide={wide} label={step.label} folders={folders} onBack={() => (setNote(undefined), setStep({ s: 'folder' }))} onOpen={onOpen} />}
@@ -105,8 +105,9 @@ function FolderArt() {
     [<Sheet size={20} />, 'טבלאות'],
   ]
   return (
-    <div aria-hidden style={{ height: 208, paddingTop: 28, display: 'grid', placeItems: 'center', background: 'linear-gradient(120deg, #EEF3FF, #E6EDFF 50%, #EFEAFF)' }}>
-      <div style={{ position: 'relative', width: 200, height: 132 }}>
+    <div aria-hidden style={{ height: 112, paddingTop: 8, display: 'grid', placeItems: 'center', background: 'linear-gradient(120deg, #EEF3FF, #E6EDFF 50%, #EFEAFF)', overflow: 'hidden' }}>
+      {/* איור קטן, כדי שכפתור הבחירה ייראה בלי גלילה גם במסך נמוך */}
+      <div style={{ position: 'relative', width: 200, height: 132, transform: 'scale(0.62)', margin: '-25px 0' }}>
         <div style={{ position: 'absolute', inset: '12px 0 0', borderRadius: 18, background: 'linear-gradient(180deg,#7C98F7,#5577F0)', boxShadow: '0 16px 32px -14px rgba(69,102,232,0.7)' }} />
         {docs.map(([icon, t], i) => (
           <div key={t} style={{ position: 'absolute', top: -8 + i * 4, left: 58 + (i - 1) * 22, width: 84, height: 96, borderRadius: 10, background: '#fff', transform: `rotate(${(i - 1) * 8}deg)`, boxShadow: '0 6px 14px -6px rgba(16,24,40,0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: c.ink2 }}>
@@ -126,12 +127,12 @@ function FolderArt() {
 /** תמונה מוקטנת של החלון של כרום, כדי לזהות אותו כשהוא קופץ. הכפתור שלוחצים עליו מסומן */
 export function ChromePrompt({ folder, buttons, pick }: { folder: string; buttons: string[]; pick: string }) {
   return (
-    <div aria-hidden dir="ltr" style={{ alignSelf: 'center', width: '100%', maxWidth: 400, padding: '16px 16px', borderRadius: 14, background: '#202124', color: '#E8EAED', textAlign: 'left', boxShadow: '0 12px 24px -12px rgba(16,24,40,0.5)', fontFamily: 'inherit' }}>
+    <div aria-hidden dir="ltr" style={{ alignSelf: 'center', width: '100%', maxWidth: 400, padding: '12px 16px', borderRadius: 14, background: '#202124', color: '#E8EAED', textAlign: 'left', boxShadow: '0 12px 24px -12px rgba(16,24,40,0.5)', fontFamily: 'inherit' }}>
       <div style={{ fontSize: 14, fontWeight: 600 }}>Allow this site to edit files?</div>
       <div style={{ fontSize: 12, color: '#BDC1C6', marginTop: 8, lineHeight: 1.5 }}>
         gillyraz.github.io will be able to edit files in <bdi style={{ color: '#E8EAED', fontWeight: 700, whiteSpace: 'nowrap' }}>{folder}</bdi>
       </div>
-      <div style={{ display: 'flex', flexDirection: buttons.length > 2 ? 'column' : 'row', alignItems: buttons.length > 2 ? 'stretch' : undefined, justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+      <div style={{ display: 'flex', flexDirection: buttons.length > 2 ? 'column' : 'row', alignItems: buttons.length > 2 ? 'stretch' : undefined, justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
         {buttons.map((b) => (
           <span key={b} style={{ height: 32, padding: '0 14px', borderRadius: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', background: '#1F3A5F', color: b === pick ? '#D2E3FC' : 'rgba(210,227,252,0.5)', boxShadow: b === pick ? '0 0 0 2px #202124, 0 0 0 4px #F5B400' : undefined }}>
             {b}
@@ -145,7 +146,7 @@ export function ChromePrompt({ folder, buttons, pick }: { folder: string; button
 /** הסבר לפני שהחלון של כרום קופץ: כותרת, מה לוחצים, ותמונה של החלון */
 function PromptHint({ title, children, prompt }: { title: string; children: ReactNode; prompt: ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 20px 20px', borderRadius: 14, background: c.warnSoft, color: c.primaryInk, fontSize: 13, lineHeight: 1.6, textAlign: 'start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 20px 16px', borderRadius: 14, background: c.warnSoft, color: c.primaryInk, fontSize: 13, lineHeight: 1.6, textAlign: 'start' }}>
       <div>
         <b style={{ display: 'block', fontSize: 14 }}>{title}</b>
         {children}
@@ -158,9 +159,9 @@ function PromptHint({ title, children, prompt }: { title: string; children: Reac
 function FolderStep({ wide, onPick, note, refused }: { wide: boolean; onPick: () => void; note?: string; refused?: 'cancel' | 'denied' }) {
   return (
     <Card art={<FolderArt />}>
-      <div style={{ padding: wide ? '32px 40px 36px' : 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: wide ? '28px 40px 32px' : 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Steps n={1} />
-        <h1 style={{ ...h1, marginTop: 12 }}>איפה לשמור את המידע?</h1>
+        <h1 style={{ ...h1, marginTop: 8 }}>איפה לשמור את המידע?</h1>
         <p style={lead}>בוחרים תיקייה במחשב. רשימת המטופלים, הסריקות והטבלאות יישמרו בה ורק בה. התיקייה היא גם הגיבוי: מעתיקים אותה, ויש עותק של הכול.</p>
         <Note tone="tip">עדיף תיקייה שלא מסונכרנת לענן (לא בתוך Google Drive או OneDrive), כדי שהמידע לא ייצא מהמחשב.</Note>
         {note && <Note tone="danger">{note}</Note>}
@@ -174,7 +175,7 @@ function FolderStep({ wide, onPick, note, refused }: { wide: boolean; onPick: ()
             לוחצים <b>Allow</b>. בלי האישור הכלי לא יכול לשמור את המידע. האישור הוא רק לתיקייה שבחרתם.
           </PromptHint>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
           <Button kind="primary" icon={<FolderOpen size={18} />} onClick={onPick} style={{ height: 48, padding: '0 22px', fontSize: 15 }}>
             בחירת תיקייה במחשב
           </Button>
