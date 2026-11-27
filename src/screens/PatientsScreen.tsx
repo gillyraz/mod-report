@@ -119,16 +119,16 @@ export default function PatientsScreen({ ctx }: { ctx: Ctx }) {
                 </span>
                 {!wide && (
                   <span style={{ fontSize: 14, color: c.ink2 }}>
-                    תיק {p.fileNo} · הפנייה {p.referralNo} · {ils(p.rate)} למפגש
+                    תיק {p.fileNo || <Missing />} · הפנייה {p.referralNo || <Missing />} · {p.rate > 0 ? `${ils(p.rate)} למפגש` : <>סכום <Missing /></>}
                   </span>
                 )}
                 </div>
               </div>
               {wide && (
                 <>
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.fileNo}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.referralNo}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{ils(p.rate)}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.fileNo || <Missing />}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.referralNo || <Missing />}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{p.rate > 0 ? ils(p.rate) : <Missing />}</span>
                   <ChevronLeft size={18} style={{ color: c.ink4, justifySelf: 'end' }} />
                 </>
               )}
@@ -156,7 +156,7 @@ function EmptyPatients({ ctx, onAdd, onImport }: { ctx: Ctx; onAdd: () => void; 
       {fields.map((l, i) => (
         <div key={l}>
           <div style={{ fontSize: 11, color: c.ink3, marginBottom: 4 }}>{l}</div>
-          <div style={{ height: 28, borderRadius: 8, background: c.field, boxShadow: `inset 0 0 0 ${i ? 1 : 2}px ${i ? c.line : c.primary}`, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13 }}>{i ? '' : 'דנה לוי'}</div>
+          <div style={{ height: 28, borderRadius: 8, background: c.field, boxShadow: `inset 0 0 0 ${i ? 1 : 2}px ${i ? c.fieldLine : c.primary}`, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13 }}>{i ? '' : 'דנה לוי'}</div>
         </div>
       ))}
     </div>
@@ -216,3 +216,6 @@ function Way({ icon, title, text, art, children }: { icon: ReactNode; title: str
     </section>
   )
 }
+
+// פרט שחסר (למשל אחרי ייבוא מאקסל). לחיצה על השורה פותחת את הטופס להשלמה
+const Missing = () => <span style={{ color: c.warn, fontWeight: 500 }}>חסר</span>

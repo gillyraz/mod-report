@@ -21,7 +21,7 @@ export default function PatientForm({
   const [name, setName] = useState(patient?.name ?? '')
   const [fileNo, setFileNo] = useState(patient?.fileNo ?? '')
   const [referralNo, setReferralNo] = useState(patient?.referralNo ?? '')
-  const [rate, setRate] = useState(patient ? String(patient.rate) : '')
+  const [rate, setRate] = useState(patient && patient.rate > 0 ? String(patient.rate) : '')
   const [tried, setTried] = useState(false)
 
   const rateNum = parseFloat(rate.replace(/[^\d.]/g, ''))
@@ -40,7 +40,7 @@ export default function PatientForm({
     <Sheet
       title={patient ? 'עריכת מטופל' : 'מטופל חדש'}
       icon={patient ? <UserPen size={20} /> : <UserPlus size={20} />}
-      sub="הפרטים מוזנים פעם אחת ומשמשים לכל חודש."
+      sub="הפרטים מוזנים פעם אחת."
       onClose={onClose}
       footer={
         <>

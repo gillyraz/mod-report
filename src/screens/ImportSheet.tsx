@@ -30,6 +30,7 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
   }
   const good = rows?.filter((r) => !r.problem) ?? []
   const bad = rows?.filter((r) => r.problem) ?? []
+  const partial = good.filter((r) => r.missing.length).length
 
   const save = () => {
     const now = Date.now()
@@ -85,8 +86,16 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
       {!rows ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <p style={{ margin: 0, fontSize: 15, color: c.ink2, lineHeight: 1.6 }}>
-            קובץ אקסל (‎.xlsx) או CSV, עם שורת כותרות ומתחתיה מטופל אחד בכל שורה. הכלי מזהה את העמודות לפי הכותרות, בכל סדר.
+            קובץ אקסל (‎.xlsx) או CSV, עם שורת כותרות ומתחתיה מטופל אחד בכל שורה.
+            <br />
+            הכלי מזהה את העמודות לפי הכותרות, בכל סדר.
           </p>
+
+          {!file && (
+            <Button kind="ghost" icon={<Download size={18} />} onClick={template} style={{ alignSelf: 'flex-start', marginTop: -8, height: 32, padding: '0 8px', marginInlineStart: -8 }}>
+              הורדת תבנית אקסל
+            </Button>
+          )}
 
           {fileRow}
           {/* אזור ההעלאה: לחיצה או גרירת קובץ */}
@@ -121,10 +130,6 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
               <span>{error}</span>
             </div>
           )}
-
-          <Button kind="ghost" icon={<Download size={18} />} onClick={template} style={{ alignSelf: 'flex-start' }}>
-            הורדת תבנית אקסל
-          </Button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -137,7 +142,17 @@ export default function ImportSheet({ ctx, onClose, onDone }: { ctx: Ctx; onClos
             <Group tone="ok" title={good.length === 1 ? 'מטופל אחד יתווסף לרשימת המטופלים' : `${good.length} מטופלים יתווספו לרשימת המטופלים`} rows={good} />
           ) : null}
           {good.length > 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: c.ink2, lineHeight: 1.6 }}>הם עוד לא מוכנים לדיווח. אחרי ההוספה מזינים לכל מטופל את מספר המפגשים של החודש ומצרפים את הטופס הסרוק, ואז הוא עובר ל״מוכנים לדיווח״.</p>
+            <p style={{ margin: 0, fontSize: 13, color: c.ink2, lineHeight: 1.6 }}>
+              הם עוד לא מוכנים לדיווח.
+              <br />
+              אחרי ההוספה מזינים לכל מטופל את מספר המפגשים של החודש ומצרפים את הטופס הסרוק, ואז הוא עובר ל״מוכנים לדיווח״.
+              {partial > 0 && (
+                <>
+                  <br />
+                  {partial === 1 ? 'למטופל אחד חסרים פרטים' : `ל-${partial} מטופלים חסרים פרטים`}. משלימים אותם אחר כך, ועד אז הם לא ייכנסו לדיווח.
+                </>
+              )}
+            </p>
           ) : (
             <p style={{ margin: 0, fontSize: 14, color: c.ink2 }}>אין בקובץ מטופלים חדשים להוספה. אפשר לתקן את הקובץ ולבחור אותו שוב.</p>
           )}
@@ -172,9 +187,9 @@ function Group({ tone, title, rows }: { tone: 'ok' | 'warn'; title: string; rows
               <tr key={r.line} style={{ borderTop: `1px solid ${c.line}` }}>
                 <td style={{ ...td, color: c.ink2, fontVariantNumeric: 'tabular-nums' }}>{r.line}</td>
                 <td style={{ ...td, fontWeight: 500 }}>{r.name || <Empty />}</td>
-                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.fileNo || <Empty />}</td>
-                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.referralNo || <Empty />}</td>
-                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.rate > 0 && !warn ? ils(r.rate) : r.rateText || <Empty />}</td>
+                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.fileNo || <Empty flag={!warn} />}</td>
+                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.referralNo || <Empty flag={!warn} />}</td>
+                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.rate > 0 ? ils(r.rate) : <Empty flag={!warn} />}</td>
                 {warn && <td style={{ ...td, color: c.warn, fontWeight: 500 }}>{r.problem}</td>}
               </tr>
             ))}
@@ -185,4 +200,5 @@ function Group({ tone, title, rows }: { tone: 'ok' | 'warn'; title: string; rows
   )
 }
 
-const Empty = () => <span style={{ color: c.ink3 }}>חסר</span>
+// flag: פרט חסר במטופל שייכנס, כדי שיבלוט שצריך להשלים אותו
+const Empty = ({ flag }: { flag?: boolean }) => <span style={{ color: flag ? c.warn : c.ink3, fontWeight: flag ? 500 : 400 }}>חסר</span>

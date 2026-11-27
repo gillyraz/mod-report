@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { AlertCircle, AlertTriangle, Sparkles, Check, CheckCircle2, ChevronLeft, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, EASE, lift, Stepper } from '../ui'
-import { calc, ils, monthLabel, rateOf, refOf, setVatFrom, uid, vatOf, type Entry, type Patient, type Scan } from '../model'
+import { calc, ils, missingOf, monthLabel, rateOf, refOf, setVatFrom, uid, updatePatient, vatOf, type Entry, type Patient, type Scan } from '../model'
 import { makeThumb } from '../pdf'
 import AssignSheet from './AssignSheet'
 import ScanSheet from './ScanSheet'
@@ -22,6 +22,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const { data, setData, scans, setScans, month, setMonth, toast, wide, headerH } = ctx
   const entries = data.months[month] ?? {}
   const [adding, setAdding] = useState(false)
+  const [fixing, setFixing] = useState<Patient | null>(null)
   const [importing, setImporting] = useState(false)
   const [sort, setSort] = useState<Sort>('added')
   const [query, setQuery] = useState('')
@@ -48,7 +49,12 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
   const shown = q ? patients.filter((p) => p.name.includes(q) || p.fileNo.includes(q) || refOf(p, entries[p.id]).includes(q)) : patients
   // אפשר להכניס לטבלה רק מטופל שיש לו מפגשים וגם סריקה של הטופס
   const hasScan = (id: string) => scans.some((x) => x.id === entries[id]?.scanId)
-  const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id)
+  const incomplete = (id: string) => {
+    const p = data.patients.find((x) => x.id === id)
+    return !p || missingOf(p, entries[id]).length > 0
+  }
+  // וגם כל הפרטים שלו מלאים (מספר תיק, הפנייה וסכום)
+  const canReport = (id: string) => hasSessions(entries[id]) && hasScan(id) && !incomplete(id)
   const eligible = patients.filter((p) => canReport(p.id))
   const total = patients.reduce((sum, p) => sum + calc(p, entries[p.id], vatOf(data, month)).total, 0)
   // הטבלה של החודש: מתי נשמרה, ואם הנתונים השתנו מאז
@@ -158,6 +164,21 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         setAdding(false)
         setFlash(p.id)
         toast(`${p.name} נוסף לרשימה`)
+      }}
+    />
+  )
+
+  // השלמת פרטים חסרים של מטופל, בלי לעזוב את עמוד החודש
+  const fixForm = fixing && (
+    <PatientForm
+      others={data.patients}
+      month={month}
+      patient={fixing}
+      onClose={() => setFixing(null)}
+      onSave={(p) => {
+        setData((d) => updatePatient(d, p, month))
+        setFixing(null)
+        toast('הפרטים נשמרו')
       }}
     />
   )
@@ -385,7 +406,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
         <span>מפגשים חתומים</span>
         <span>ביטולים ללא הודעה</span>
         <span>סה״כ לטופס</span>
-        <span style={{ textAlign: 'end' }}>טופס סרוק</span>
+        <span />
       </div>
     )
 
@@ -406,6 +427,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       }}
       onView={(scan) => setViewScan({ scan, patient: p })}
       onEntry={(fn) => setEntry(p.id, fn)}
+      onFix={() => setFixing(p)}
     />
   )
 
@@ -438,11 +460,11 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
             placeholder="חיפוש לפי שם, תיק או הפנייה"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ width: '100%', height: 40, borderRadius: 12, border: 'none', boxShadow: `0 0 0 1px ${c.line}`, background: c.surface, color: c.ink, padding: '0 12px', paddingInlineStart: 40, fontSize: 14 }}
+            style={{ width: '100%', height: 40, borderRadius: 12, border: 'none', boxShadow: `0 0 0 1px ${c.fieldLine}`, background: c.field, color: c.ink, padding: '0 12px', paddingInlineStart: 40, fontSize: 14 }}
           />
         </label>
         {!wide && (
-          <select aria-label="מיון המטופלים" value={sort} onChange={(e) => setSort(e.target.value as Sort)} style={{ height: 40, borderRadius: 10, border: 'none', boxShadow: '0 0 0 1px #DCE3EE', background: c.surface, color: c.ink, padding: '0 8px', fontSize: 14 }}>
+          <select aria-label="מיון המטופלים" value={sort} onChange={(e) => setSort(e.target.value as Sort)} style={{ height: 40, borderRadius: 10, border: 'none', boxShadow: `0 0 0 1px ${c.fieldLine}`, background: c.field, color: c.ink, padding: '0 8px', fontSize: 14 }}>
             <option value="added">לפי סדר ההוספה</option>
             <option value="first">לפי שם פרטי</option>
             <option value="last">לפי שם משפחה</option>
@@ -462,7 +484,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
           </div>
         )}
         {showReady && (
-          <Group tone="ok" title="מוכנים לדיווח" count={readyList.length} sub="יש מפגשים וסריקה מצורפת" head={colHead(true, true)}>
+          <Group tone="ok" title="מוכנים לדיווח" count={readyList.length} head={colHead(true, true)}>
             {readyList.length ? (
               readyList.map(rowOf)
             ) : (
@@ -473,7 +495,7 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
           </Group>
         )}
         {showNeed && (
-          <Group tone="warn" title="צריכים השלמה" count={needList.length} sub="לא ייכנסו לדיווח עד שיושלמו" head={colHead(!showReady, false)}>
+          <Group tone="warn" title="צריכים השלמה" count={needList.length} head={colHead(!showReady, false)}>
             {needList.map(rowOf)}
           </Group>
         )}
@@ -504,7 +526,8 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       <input ref={oneInput} type="file" accept={ACCEPT} hidden onChange={(e) => (importFiles(e.target.files, target.current ?? undefined), (e.target.value = ''))} />
 
       {addForm}
-        {importForm}
+      {importForm}
+      {fixForm}
       {assigning && (
         <AssignSheet
           scans={unassigned}
@@ -608,6 +631,7 @@ function Row({
   onAttach,
   onView,
   onEntry,
+  onFix,
 }: {
   p: Patient
   e: Entry | undefined
@@ -620,13 +644,15 @@ function Row({
   onAttach: () => void
   onView: (s: Scan) => void
   onEntry: (fn: (e: Entry) => Entry) => void
+  onFix: () => void
 }) {
   const { wide, data } = ctx
   const r = calc(p, e, vatOf(data, ctx.month))
   const has = r.sessions > 0
-  const ready = has && !!scan
+  const missing = missingOf(p, e)
+  const ready = has && !!scan && !missing.length
   const dim = select && !select.can
-  const need = ready ? null : has ? 'חסרה סריקה של הטופס החתום' : scan ? 'לא הוזנו מפגשים החודש' : 'לא הוזנו מפגשים ואין סריקה'
+  const need = missing.length ? `חסר: ${missing.join(', ')}` : ready ? null : has ? 'חסרה סריקה של הטופס החתום' : scan ? 'לא הוזנו מפגשים החודש' : 'לא הוזנו מפגשים ואין סריקה'
   const meta = `תיק ${p.fileNo} · הפנייה ${refOf(p, e)} · ${ils(rateOf(p, e))} למפגש`
 
   const who = (
@@ -648,6 +674,11 @@ function Row({
           <span title={meta} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: c.warn, fontWeight: 500 }}>
             <AlertCircle size={14} style={{ flex: '0 0 14px' }} />
             {need}
+            {missing.length > 0 && !select && (
+              <button onClick={onFix} style={{ border: 'none', background: 'transparent', padding: '0 4px', font: 'inherit', fontSize: 13, fontWeight: 600, color: c.primary, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                השלמת הפרטים
+              </button>
+            )}
           </span>
         ) : (
           <span style={{ fontSize: 13, color: c.ink3, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={meta}>{meta}</span>
@@ -730,7 +761,7 @@ function Row({
 }
 
 /** קבוצת מטופלים על משטח משותף */
-function Group({ tone, title, count, sub, head, children }: { tone: 'ok' | 'warn'; title: string; count: number; sub: string; head: ReactNode; children: ReactNode }) {
+function Group({ tone, title, count, head, children }: { tone: 'ok' | 'warn'; title: string; count: number; head: ReactNode; children: ReactNode }) {
   const col = tone === 'ok' ? c.ok : c.warn
   return (
     <section aria-label={title} style={{ background: tone === 'ok' ? c.okSurf : c.group, borderRadius: 24, padding: '16px 8px 8px' }}>
@@ -738,7 +769,6 @@ function Group({ tone, title, count, sub, head, children }: { tone: 'ok' | 'warn
         <span style={{ color: col, display: 'flex' }}>{tone === 'ok' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}</span>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: col }}>{title}</h3>
         <span style={{ minWidth: 22, height: 22, padding: '0 6px', borderRadius: 11, background: c.surface, color: col, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
-        <span style={{ fontSize: 13, color: c.ink3, marginInlineStart: 8 }}>{sub}</span>
       </div>
       {head}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>

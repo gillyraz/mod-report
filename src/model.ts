@@ -108,6 +108,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 
 export const rateOf = (p: Patient, e: Entry | undefined) => e?.rate ?? p.rate
 export const refOf = (p: Patient, e: Entry | undefined) => e?.referralNo ?? p.referralNo
+/** פרטים שחסרים למטופל (למשל אחרי ייבוא מאקסל). בלעדיהם הוא לא נכנס לדיווח */
+export const missingOf = (p: Patient, e?: Entry) =>
+  [!p.fileNo.trim() && 'מספר תיק', !refOf(p, e).trim() && 'מספר הפנייה', !(rateOf(p, e) > 0) && 'סכום למפגש'].filter(Boolean) as string[]
 export const vatOf = (d: Data, month: string): Vat => d.monthVat?.[month] ?? { rate: d.settings.vatRate, exempt: d.settings.vatExempt }
 
 export function calc(p: Patient, e: Entry | undefined, v: Vat) {

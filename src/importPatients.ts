@@ -15,6 +15,7 @@ export type ImportRow = {
   rateText: string
   problem?: string // למה השורה לא תיכנס
   dup?: boolean
+  missing: string[] // פרטים שחסרים ויושלמו אחר כך
 }
 export type ImportResult = { ok: true; rows: ImportRow[] } | { ok: false; error: string }
 
@@ -95,17 +96,19 @@ export async function readPatientsFile(f: File, existing: Patient[]): Promise<Im
     const get = (k: Field) => r[cols[k]!] ?? ''
     const name = get('name'), fileNo = get('fileNo'), referralNo = get('referralNo'), rateText = get('rate')
     if (!name && !fileNo && !referralNo && !rateText) return // שורה ריקה
-    const rate = parseFloat(rateText.replace(/[^\d.]/g, ''))
-    const empty = FIELDS.filter((k) => k !== 'rate' && !get(k)).map((k) => FIELD_LABEL[k])
-    if (!rateText) empty.push(FIELD_LABEL.rate)
+    // סכום שאינו מספר (למשל ״שלוש מאות״) נחשב חסר, ומשלימים אותו אחר כך בטופס המטופל
+    const numeric = !/[^\d.,₪\s]/.test(rateText)
+    const parsed = parseFloat(rateText.replace(/[^\d.]/g, ''))
+    const rate = numeric && parsed > 0 ? parsed : 0
+    // שם הוא החובה היחידה. פרט אחר שחסר נכנס כחסר, ומשלימים אותו לפני הדיווח
+    const missing = [!fileNo && FIELD_LABEL.fileNo, !referralNo && FIELD_LABEL.referralNo, !(rate > 0) && FIELD_LABEL.rate].filter(Boolean) as string[]
     let problem: string | undefined
     let dup = false
-    if (empty.length) problem = `חסר: ${empty.join(', ')}`
-    else if (!(rate > 0) || /[^\d.,₪\s]/.test(rateText)) problem = 'הסכום למפגש אינו מספר'
-    else if (known.has(fileNo)) (problem = 'כבר ברשימה'), (dup = true)
-    else if (seen.has(fileNo)) (problem = 'מופיע פעמיים בקובץ'), (dup = true)
+    if (!name) problem = 'חסר שם המטופל'
+    else if (fileNo && known.has(fileNo)) (problem = 'כבר ברשימת המטופלים'), (dup = true)
+    else if (fileNo && seen.has(fileNo)) (problem = 'מופיע פעמיים בקובץ'), (dup = true)
     if (fileNo) seen.add(fileNo)
-    rows.push({ line: head + i + 2, name, fileNo, referralNo, rate, rateText, problem, dup })
+    rows.push({ line: head + i + 2, name, fileNo, referralNo, rate, rateText: numeric ? rateText : '', problem, dup, missing })
   })
   if (!rows.length) return { ok: false, error: 'הקובץ לא כולל מטופלים מתחת לשורת הכותרות.' }
   return { ok: true, rows }

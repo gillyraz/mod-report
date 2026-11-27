@@ -92,7 +92,7 @@ export default function AssignSheet({
                         aria-label={`מטופל עבור ${s.name}`}
                         value={v ?? ''}
                         onChange={(e) => set(s.id, e.target.value || undefined)}
-                        style={{ flex: 1, minWidth: 0, height: 40, borderRadius: 8, border: `1px solid ${v ? c.ok : c.line}`, background: c.surface, padding: '0 8px', fontSize: 15, color: c.ink }}
+                        style={{ flex: 1, minWidth: 0, height: 40, borderRadius: 8, border: `1px solid ${v ? c.ok : c.fieldLine}`, background: c.field, padding: '0 8px', fontSize: 15, color: c.ink }}
                       >
                         <option value="">בחירת מטופל</option>
                         {patients.map((p) => (

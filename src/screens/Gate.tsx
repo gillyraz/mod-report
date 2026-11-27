@@ -153,7 +153,7 @@ function PasswordField({ label, value, onChange, hint, autoFocus, autoComplete, 
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
           dir="ltr"
-          style={{ flex: 1, minWidth: 0, height: 48, padding: '0 16px 0 48px', textAlign: 'right', borderRadius: 12, border: 'none', outline: 'none', fontSize: 16, background: focus ? c.surface : c.field, boxShadow: invalid ? `inset 0 0 0 1px ${c.danger}` : focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.line}`, transition: `box-shadow 200ms ${EASE}` }}
+          style={{ flex: 1, minWidth: 0, height: 48, padding: '0 16px 0 48px', textAlign: 'right', borderRadius: 12, border: 'none', outline: 'none', fontSize: 16, background: c.field, boxShadow: invalid ? `inset 0 0 0 1px ${c.danger}` : focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.fieldLine}`, transition: `box-shadow 200ms ${EASE}` }}
         />
         <button type="button" onClick={() => setShow(!show)} aria-label={show ? 'הסתרת הסיסמה' : 'הצגת הסיסמה'} style={{ position: 'absolute', left: 6, top: 6, width: 36, height: 36, borderRadius: 10, border: 'none', background: 'transparent', color: c.ink3, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
           {show ? <EyeOff size={18} /> : <Eye size={18} />}

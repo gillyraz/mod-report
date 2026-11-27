@@ -8,7 +8,9 @@ export const c = {
   surface: '#FFFFFF',
   sub: '#F2F5FB',
   group: '#EDF1F8',
-  field: '#F6F8FC',
+  // שדות תמיד לבנים עם מסגרת ברורה, כדי שייראו לחיצים
+  field: '#FFFFFF',
+  fieldLine: '#D3DAE6',
   ink: '#101828',
   ink2: '#475467',
   ink3: '#667085',
@@ -154,8 +156,8 @@ export function Field({
             borderRadius: 12,
             border: 'none',
             outline: 'none',
-            boxShadow: focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.line}`,
-            background: focus ? c.surface : c.field,
+            boxShadow: focus ? `inset 0 0 0 1px ${c.primary}, 0 0 0 4px rgba(69,102,232,0.14)` : `inset 0 0 0 1px ${c.fieldLine}`,
+            background: c.field,
             transition: `box-shadow 200ms ${EASE}, background 200ms ${EASE}`,
             fontSize: 16,
             color: disabled ? c.ink3 : c.ink,
@@ -191,7 +193,7 @@ export function Stepper({ value, onChange, label, hideLabel }: { value: number; 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {!hideLabel && <span style={{ fontSize: 13, color: c.ink2 }}>{label}</span>}
-      <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', background: c.sub, borderRadius: 12, height: 40, alignSelf: 'flex-start' }}>
+      <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', background: c.field, boxShadow: `inset 0 0 0 1px ${c.fieldLine}`, borderRadius: 12, height: 40, alignSelf: 'flex-start' }}>
         <button style={btn} aria-label={`הוספה: ${label}`} onClick={() => onChange(value + 1)}>
           <Plus size={16} />
         </button>
