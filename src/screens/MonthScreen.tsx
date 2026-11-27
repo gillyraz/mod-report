@@ -1,11 +1,12 @@
 import ImportSheet from './ImportSheet'
 import { useNewPatientShortcut } from './parts'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { AlertCircle, AlertTriangle, Sparkles, Check, CheckCircle2, ChevronLeft, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, UserPlus, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ScanLine, Sparkles, Check, CheckCircle2, ChevronLeft, Search, FileOutput, FileSpreadsheet, FileStack, FileUp, Paperclip, Pencil, Percent, UserPlus, X } from 'lucide-react'
 import type { Ctx } from '../App'
 import { Badge, Button, c, EASE, lift, Stepper } from '../ui'
 import { calc, ils, missingOf, monthLabel, rateOf, refOf, setVatFrom, uid, updatePatient, vatOf, type Entry, type Patient, type Scan } from '../model'
 import { makeThumb } from '../pdf'
+import { detectSignatures, SIG_VERSION } from '../detect'
 import AssignSheet from './AssignSheet'
 import ScanSheet from './ScanSheet'
 import { Avatar, MonthSwitcher, PageBar } from './parts'
@@ -115,6 +116,21 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
     if (auto === made.length) toast(auto === 1 ? 'הסריקה שויכה אוטומטית לפי שם הקובץ' : `${auto} סריקות שויכו אוטומטית לפי שם הקובץ`)
     else setAssigning(true)
   }
+
+  // ספירת החתימות בכל סריקה, ברקע ועל המחשב עצמו
+  const counting = useRef(new Set<string>())
+  useEffect(() => {
+    const todo = scans.filter((x) => x.sigV !== SIG_VERSION && !counting.current.has(x.id))
+    if (!todo.length) return
+    todo.forEach((x) => counting.current.add(x.id))
+    void (async () => {
+      for (const x of todo) {
+        const sig = await detectSignatures(x.blob)
+        setScans((s0) => s0.map((y) => (y.id === x.id ? { ...y, sig, sigV: SIG_VERSION } : y)))
+        counting.current.delete(x.id)
+      }
+    })()
+  }, [scans, setScans])
 
   // גרסת הניסיון: ייבוא סריקות לדוגמה
   const importRef = useRef(importFiles)
@@ -541,8 +557,13 @@ export default function MonthScreen({ ctx }: { ctx: Ctx }) {
       )}
       {viewScan && (
         <ScanSheet
-          scan={viewScan.scan}
+          scan={scans.find((x) => x.id === viewScan.scan.id) ?? viewScan.scan}
           patient={viewScan.patient}
+          signed={entries[viewScan.patient.id]?.signed ?? 0}
+          onApply={(n) => {
+            setEntry(viewScan.patient.id, (e) => ({ ...e, signed: n }))
+            toast(`הוזנו ${n} מפגשים חתומים ל${viewScan.patient.name}`)
+          }}
           onReplace={() => {
             target.current = viewScan.patient.id
             setViewScan(null)
@@ -714,6 +735,25 @@ function Row({
     </Button>
   )
 
+  // מה שזוהה בסריקה: הצעה בלבד, נכנס רק בלחיצה
+  const found = scan?.sig?.count
+  const signed = e?.signed ?? 0
+  const sigHint =
+    found === undefined || found === 0 || select ? null : found === signed ? (
+      <span title="מספר השורות החתומות בסריקה זהה למספר שהוזן" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, fontSize: 12, color: c.ok, fontWeight: 500, whiteSpace: 'nowrap' }}>
+        <Check size={14} /> תואם לסריקה
+      </span>
+    ) : (
+      <button
+        onClick={() => onEntry((x) => ({ ...x, signed: found }))}
+        title={`בסריקה זוהו ${found} שורות חתומות. לחיצה מזינה ${found} מפגשים חתומים`}
+        className="link-btn"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, padding: 0, border: 'none', background: 'transparent', font: 'inherit', fontSize: 12, fontWeight: 600, color: c.primary, cursor: 'pointer', whiteSpace: 'nowrap' }}
+      >
+        <ScanLine size={14} /> הזנת {found} מהסריקה
+      </button>
+    )
+
   const box = select && <Check4 checked={select.on} disabled={!select.can} label={select.can ? `הכללת ${p.name} בטבלה` : `${p.name}: ${need}`} onChange={select.toggle} />
 
   const look: CSSProperties = {
@@ -727,11 +767,12 @@ function Row({
 
   if (wide)
     return (
-      <div id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 'clamp(12px, 1.6vw, 24px)', alignItems: 'center', padding: '12px 24px', minHeight: 80, ...look }}>
+      <div id={`row-${p.id}`} style={{ display: 'grid', gridTemplateColumns: cols, gap: 'clamp(12px, 1.6vw, 24px)', alignItems: 'center', padding: sigHint ? '12px 24px 28px' : '12px 24px', minHeight: 80, ...look }}>
         {box}
         {who}
-        <div data-tour="sessions" style={{ justifySelf: 'start' }}>
+        <div data-tour="sessions" style={{ justifySelf: 'start', position: 'relative' }}>
           <Stepper hideLabel label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
+          {sigHint && <div style={{ position: 'absolute', top: 'calc(100% + 4px)', insetInlineStart: 0 }}>{sigHint}</div>}
         </div>
         <Stepper hideLabel label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
         {sums}
@@ -746,7 +787,10 @@ function Row({
         <div style={{ flex: 1, minWidth: 0 }}>{who}</div>
       </div>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Stepper label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Stepper label="מפגשים חתומים" value={e?.signed ?? 0} onChange={(n) => onEntry((x) => ({ ...x, signed: n }))} />
+          {sigHint}
+        </div>
         <Stepper label="ביטולים ללא הודעה" value={e?.cancelled ?? 0} onChange={(n) => onEntry((x) => ({ ...x, cancelled: n }))} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>

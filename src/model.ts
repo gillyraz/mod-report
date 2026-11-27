@@ -1,3 +1,4 @@
+import type { Sig } from './detect'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 
 // בגרסת הניסיון, או כשהדפדפן חוסם אחסון, המידע נשמר בזיכרון בלבד
@@ -45,6 +46,9 @@ export type Scan = {
   month: string
   patientId?: string
   addedAt: number
+  // חתימות שזוהו בטופס (על המחשב עצמו). null = לא הצלחנו לספור
+  sig?: Sig | null
+  sigV?: number
 }
 
 export type Data = {
