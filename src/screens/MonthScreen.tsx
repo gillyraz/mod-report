@@ -750,7 +750,7 @@ function Row({
         className="link-btn"
         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, padding: 0, border: 'none', background: 'transparent', font: 'inherit', fontSize: 12, fontWeight: 600, color: c.primary, cursor: 'pointer', whiteSpace: 'nowrap' }}
       >
-        <ScanLine size={14} /> הזנת {found} מהסריקה
+        <ScanLine size={14} /> {found === 1 ? 'מפגש אחד בטופס' : `${found} מפגשים בטופס`}
       </button>
     )
 
